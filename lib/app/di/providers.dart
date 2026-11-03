@@ -122,6 +122,11 @@ class PgRepository {
       Map<String, dynamic>.from(await api.get('/expenses/$id') as Map);
   Future<Map<String, dynamic>> lead(String id) async =>
       Map<String, dynamic>.from(await api.get('/leads/$id') as Map);
+  Future<Map<String, dynamic>> leadStats(String? propertyId) async =>
+      Map<String, dynamic>.from(
+        await api.get('/leads/stats', query: {'propertyId': ?propertyId})
+            as Map,
+      );
   Future<Map<String, dynamic>> staff(String id) async =>
       Map<String, dynamic>.from(await api.get('/staff/$id') as Map);
   Future<Map<String, dynamic>> complaint(String id) async =>
@@ -179,6 +184,60 @@ class PgRepository {
 final repositoryProvider = Provider(
   (ref) => PgRepository(ref.watch(apiClientProvider)),
 );
+
+/// Presentation-facing command/query coordinator.
+///
+/// Screens depend on this ViewModel instead of reaching into the data-layer
+/// repository. Feature-specific notifiers remain responsible for paginated
+/// list state; this coordinator owns one-shot form and detail operations.
+class PgOperationsViewModel {
+  PgOperationsViewModel(this._repository);
+
+  final PgRepository _repository;
+
+  Future<void> switchOrganization(String id) =>
+      _repository.switchOrganization(id);
+  Future<Property> createProperty(Map<String, dynamic> body) =>
+      _repository.createProperty(body);
+  Future<void> createRoom(String propertyId, Map<String, dynamic> body) =>
+      _repository.createRoom(propertyId, body);
+  Future<Resident> resident(String id) => _repository.resident(id);
+  Future<Map<String, dynamic>> residentDetails(String id) =>
+      _repository.residentDetails(id);
+  Future<Map<String, dynamic>> expense(String id) => _repository.expense(id);
+  Future<Map<String, dynamic>> lead(String id) => _repository.lead(id);
+  Future<Map<String, dynamic>> staff(String id) => _repository.staff(id);
+  Future<Map<String, dynamic>> complaint(String id) =>
+      _repository.complaint(id);
+  Future<Map<String, dynamic>> receipt(String id) => _repository.receipt(id);
+  Future<String> report(String type) => _repository.report(type);
+  Future<List<Map<String, dynamic>>> list(
+    String path, {
+    Map<String, dynamic>? query,
+  }) => _repository.list(path, query: query);
+  Future<dynamic> create(String path, Map<String, dynamic> body) =>
+      _repository.create(path, body);
+  Future<void> createResident(Map<String, dynamic> body) =>
+      _repository.createResident(body);
+  Future<void> updateResident(String id, Map<String, dynamic> body) =>
+      _repository.updateResident(id, body);
+  Future<String> upload({
+    required String filePath,
+    required String filename,
+    required String purpose,
+  }) => _repository.upload(
+    filePath: filePath,
+    filename: filename,
+    purpose: purpose,
+  );
+  Future<void> update(String path, Map<String, dynamic> body) =>
+      _repository.update(path, body);
+  Future<void> delete(String path) => _repository.delete(path);
+}
+
+final operationsViewModelProvider = Provider(
+  (ref) => PgOperationsViewModel(ref.watch(repositoryProvider)),
+);
 final propertiesProvider = FutureProvider<List<Property>>(
   (ref) => ref.watch(repositoryProvider).properties(),
 );
@@ -190,6 +249,41 @@ final membersProvider =
       (ref, orgId) =>
           ref.watch(repositoryProvider).list('/organizations/$orgId/members'),
     );
+final roomProvider = FutureProvider.family<Room, String>(
+  (ref, id) => ref.watch(repositoryProvider).room(id),
+);
+final residentProvider = FutureProvider.family<Resident, String>(
+  (ref, id) => ref.watch(repositoryProvider).resident(id),
+);
+final complaintProvider = FutureProvider.family<Map<String, dynamic>, String>(
+  (ref, id) => ref.watch(repositoryProvider).complaint(id),
+);
+final receiptProvider = FutureProvider.family<Map<String, dynamic>, String>(
+  (ref, id) => ref.watch(repositoryProvider).receipt(id),
+);
+final reportProvider = FutureProvider.family<String, String>(
+  (ref, type) => ref.watch(repositoryProvider).report(type),
+);
+final optionsProvider =
+    FutureProvider.family<List<Map<String, dynamic>>, String>(
+      (ref, path) => ref.watch(repositoryProvider).list(path),
+    );
+final activityProvider =
+    FutureProvider.family<
+      List<Map<String, dynamic>>,
+      ({String entityType, String entityId})
+    >(
+      (ref, query) => ref
+          .watch(repositoryProvider)
+          .activity(query.entityType, query.entityId),
+    );
+final payoutAccountsProvider = FutureProvider<List<Map<String, dynamic>>>(
+  (ref) => ref.watch(repositoryProvider).list('/payouts/accounts'),
+);
+final leadStatsProvider = FutureProvider<Map<String, dynamic>>((ref) async {
+  final property = ref.watch(selectedPropertyProvider);
+  return ref.watch(repositoryProvider).leadStats(property);
+});
 final roomsProvider = AsyncNotifierProvider<RoomsViewModel, List<Room>>(
   RoomsViewModel.new,
 );

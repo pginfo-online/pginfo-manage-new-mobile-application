@@ -281,6 +281,37 @@ class _LeadsState extends ConsumerState<_LeadsTab> {
             ),
             const SizedBox(height: 8),
             PgAsync(
+              value: ref.watch(leadStatsProvider),
+              retry: () => ref.invalidate(leadStatsProvider),
+              data: (stats) {
+                final byStatus = stats['byStatus'] as Map? ?? const {};
+                return GridView.count(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  crossAxisCount: 2,
+                  childAspectRatio: 1.6,
+                  children: [
+                    MetricCard(
+                      label: 'Total leads',
+                      value: '${stats['total']}',
+                    ),
+                    MetricCard(
+                      label: 'New leads',
+                      value: '${byStatus['NEW'] ?? 0}',
+                    ),
+                    MetricCard(
+                      label: 'Visited',
+                      value: '${byStatus['VISITED'] ?? 0}',
+                    ),
+                    MetricCard(
+                      label: 'Conversion',
+                      value: '${stats['conversionRate']}%',
+                    ),
+                  ],
+                );
+              },
+            ),
+            PgAsync(
               value: ref.watch(pagedListProvider(query)),
               retry: () => ref.invalidate(pagedListProvider(query)),
               data: (items) => Column(
@@ -418,12 +449,12 @@ class _TeamState extends ConsumerState<_TeamTab> {
                               );
                               if (confirmed != true) return;
                               await ref
-                                  .read(repositoryProvider)
+                                  .read(operationsViewModelProvider)
                                   .delete(
                                     '/organizations/$orgId/members/${member['id']}',
                                   );
                             } else {
-                              await ref.read(repositoryProvider).update(
+                              await ref.read(operationsViewModelProvider).update(
                                 '/organizations/$orgId/members/${member['id']}',
                                 {'role': role},
                               );

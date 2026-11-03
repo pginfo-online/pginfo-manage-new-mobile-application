@@ -352,7 +352,9 @@ class _PropertyFormState extends ConsumerState<PropertyFormScreen> {
           if (fields[key]!.text.trim().isNotEmpty)
             key: fields[key]!.text.trim(),
       };
-      final property = await ref.read(repositoryProvider).createProperty(body);
+      final property = await ref
+          .read(operationsViewModelProvider)
+          .createProperty(body);
       ref.read(selectedPropertyProvider.notifier).select(property.id);
       ref.invalidate(propertiesProvider);
       ref.invalidate(roomsProvider);
@@ -574,7 +576,7 @@ class _RoomFormState extends ConsumerState<RoomFormScreen> {
     if (id == null) return;
     setState(() => busy = true);
     try {
-      await ref.read(repositoryProvider).createRoom(id, {
+      await ref.read(operationsViewModelProvider).createRoom(id, {
         'roomNumber': number.text.trim(),
         'floor': floor.text.trim().isEmpty ? '0' : floor.text.trim(),
         'sharingType': sharing,
@@ -671,107 +673,91 @@ class RoomDetailScreen extends ConsumerWidget {
   const RoomDetailScreen({super.key, required this.id});
   final String id;
   @override
-  Widget build(BuildContext context, WidgetRef ref) => FutureBuilder<Room>(
-    future: ref.read(repositoryProvider).room(id),
-    builder: (context, snapshot) {
-      if (!snapshot.hasData) {
-        return Scaffold(
-          appBar: const PgHeader(title: 'Room'),
-          body: Center(
-            child: Text(
-              snapshot.hasError ? snapshot.error.toString() : 'Loading…',
-            ),
-          ),
-        );
-      }
-      final room = snapshot.data!;
-      return DefaultTabController(
-        length: 3,
-        child: Scaffold(
-          appBar: AppBar(
-            title: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Room ${room.roomNumber}'),
-                if (room.property != null)
-                  Text(
-                    room.property!.name,
-                    style: Theme.of(context).textTheme.labelMedium,
-                  ),
-              ],
-            ),
-            bottom: const TabBar(
-              tabs: [
-                Tab(text: 'Tenants'),
-                Tab(text: 'Details'),
-                Tab(text: 'Activity'),
-              ],
-              isScrollable: true,
-            ),
-          ),
-          body: TabBarView(
+  Widget build(BuildContext context, WidgetRef ref) => PgAsync(
+    value: ref.watch(roomProvider(id)),
+    retry: () => ref.invalidate(roomProvider(id)),
+    data: (room) => DefaultTabController(
+      length: 3,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Consumer(
-                builder: (context, ref, _) => PgAsync(
-                  value: ref.watch(residentsProvider),
-                  data: (people) {
-                    final tenants = people
-                        .where((p) => p.roomId == id)
-                        .toList();
-                    return ListView(
-                      children: [
-                        for (final person in tenants)
-                          ListTile(
-                            leading: const CircleAvatar(
-                              child: Icon(Icons.person),
-                            ),
-                            title: Text(
-                              '${person.firstName} ${person.lastName ?? ''}',
-                            ),
-                            subtitle: Text(rupees(person.monthlyRent)),
-                            onTap: () => context.push('/tenants/${person.id}'),
-                          ),
-                        if (tenants.isEmpty)
-                          const ListTile(
-                            title: Text('No tenants in this room'),
-                          ),
-                      ],
-                    );
-                  },
+              Text('Room ${room.roomNumber}'),
+              if (room.property != null)
+                Text(
+                  room.property!.name,
+                  style: Theme.of(context).textTheme.labelMedium,
                 ),
-              ),
-              ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  MetricCard(
-                    label: 'Monthly rent',
-                    value: rupees(room.rentAmount),
-                  ),
-                  ListTile(
-                    title: Text(
-                      'Sharing: ${room.sharingType.replaceAll('_', ' ')}',
-                    ),
-                  ),
-                  ListTile(title: Text('Status: ${room.status}')),
-                  for (final bed in room.beds)
-                    ListTile(
-                      leading: const Icon(Icons.bed_outlined),
-                      title: Text('Bed ${bed.bedNumber}'),
-                      subtitle: Text(bed.status),
-                    ),
-                ],
-              ),
-              _RoomActivity(id),
             ],
           ),
-          floatingActionButton: FloatingActionButton.extended(
-            onPressed: () => context.push('/tenants/new'),
-            icon: const Icon(Icons.person_add),
-            label: const Text('Add tenant'),
+          bottom: const TabBar(
+            tabs: [
+              Tab(text: 'Tenants'),
+              Tab(text: 'Details'),
+              Tab(text: 'Activity'),
+            ],
+            isScrollable: true,
           ),
         ),
-      );
-    },
+        body: TabBarView(
+          children: [
+            Consumer(
+              builder: (context, ref, _) => PgAsync(
+                value: ref.watch(residentsProvider),
+                data: (people) {
+                  final tenants = people.where((p) => p.roomId == id).toList();
+                  return ListView(
+                    children: [
+                      for (final person in tenants)
+                        ListTile(
+                          leading: const CircleAvatar(
+                            child: Icon(Icons.person),
+                          ),
+                          title: Text(
+                            '${person.firstName} ${person.lastName ?? ''}',
+                          ),
+                          subtitle: Text(rupees(person.monthlyRent)),
+                          onTap: () => context.push('/tenants/${person.id}'),
+                        ),
+                      if (tenants.isEmpty)
+                        const ListTile(title: Text('No tenants in this room')),
+                    ],
+                  );
+                },
+              ),
+            ),
+            ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                MetricCard(
+                  label: 'Monthly rent',
+                  value: rupees(room.rentAmount),
+                ),
+                ListTile(
+                  title: Text(
+                    'Sharing: ${room.sharingType.replaceAll('_', ' ')}',
+                  ),
+                ),
+                ListTile(title: Text('Status: ${room.status}')),
+                for (final bed in room.beds)
+                  ListTile(
+                    leading: const Icon(Icons.bed_outlined),
+                    title: Text('Bed ${bed.bedNumber}'),
+                    subtitle: Text(bed.status),
+                  ),
+              ],
+            ),
+            _RoomActivity(id),
+          ],
+        ),
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: () => context.push('/tenants/new'),
+          icon: const Icon(Icons.person_add),
+          label: const Text('Add tenant'),
+        ),
+      ),
+    ),
   );
 }
 
@@ -780,33 +766,26 @@ class _RoomActivity extends ConsumerWidget {
   final String roomId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) =>
-      FutureBuilder<List<Map<String, dynamic>>>(
-        future: ref.read(repositoryProvider).activity('Room', roomId),
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return Center(child: Text(snapshot.error.toString()));
-          }
-          if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.data!.isEmpty) {
-            return const Center(child: Text('No activity recorded yet'));
-          }
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: snapshot.data!.length,
-            itemBuilder: (context, index) {
-              final event = snapshot.data![index];
-              return PgCard(
-                child: ListTile(
-                  leading: const Icon(Icons.history),
-                  title: Text('${event['action']}'.replaceAll('.', ' ')),
-                  subtitle: Text('${event['createdAt']}'),
-                ),
-              );
-            },
+  Widget build(BuildContext context, WidgetRef ref) => PgAsync(
+    value: ref.watch(activityProvider((entityType: 'Room', entityId: roomId))),
+    data: (events) {
+      if (events.isEmpty) {
+        return const Center(child: Text('No activity recorded yet'));
+      }
+      return ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: events.length,
+        itemBuilder: (context, index) {
+          final event = events[index];
+          return PgCard(
+            child: ListTile(
+              leading: const Icon(Icons.history),
+              title: Text('${event['action']}'.replaceAll('.', ' ')),
+              subtitle: Text('${event['createdAt']}'),
+            ),
           );
         },
       );
+    },
+  );
 }

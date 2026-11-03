@@ -47,6 +47,7 @@ dependencies:
   intl: ^0.20.2
   path_provider: ^2.1.5
   sentry: 9.9.0
+  pdf: ^3.13.1
 dev_dependencies:
   integration_test:
     sdk: flutter

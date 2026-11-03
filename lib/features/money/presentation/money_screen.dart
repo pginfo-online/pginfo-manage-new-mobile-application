@@ -480,12 +480,10 @@ class _ReportsTab extends StatelessWidget {
 class _BankTab extends ConsumerWidget {
   const _BankTab();
   @override
-  Widget build(
-    BuildContext context,
-    WidgetRef ref,
-  ) => FutureBuilder<List<Map<String, dynamic>>>(
-    future: ref.read(repositoryProvider).list('/payouts/accounts'),
-    builder: (context, snapshot) => ListView(
+  Widget build(BuildContext context, WidgetRef ref) => PgAsync(
+    value: ref.watch(payoutAccountsProvider),
+    retry: () => ref.invalidate(payoutAccountsProvider),
+    data: (accounts) => ListView(
       padding: const EdgeInsets.all(16),
       children: [
         const SearchField(hint: 'Search bank accounts'),
@@ -495,21 +493,17 @@ class _BankTab extends ConsumerWidget {
           icon: const Icon(Icons.add),
           label: const Text('Add bank'),
         ),
-        if (snapshot.hasError) Text(snapshot.error.toString()),
-        if (!snapshot.hasData && !snapshot.hasError)
-          const Center(child: CircularProgressIndicator()),
-        if (snapshot.hasData)
-          for (final account in snapshot.data!)
-            PgCard(
-              child: ListTile(
-                title: Text(
-                  '${account['ownerName'] ?? account['businessName'] ?? 'Account'}',
-                ),
-                subtitle: Text(
-                  '${account['status'] ?? ''} • ${account['kycStatus'] ?? ''}',
-                ),
+        for (final account in accounts)
+          PgCard(
+            child: ListTile(
+              title: Text(
+                '${account['ownerName'] ?? account['businessName'] ?? 'Account'}',
+              ),
+              subtitle: Text(
+                '${account['status'] ?? ''} • ${account['kycStatus'] ?? ''}',
               ),
             ),
+          ),
       ],
     ),
   );

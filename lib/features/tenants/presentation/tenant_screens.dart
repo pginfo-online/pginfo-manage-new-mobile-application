@@ -1,8 +1,12 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:pdf/widgets.dart' as pw;
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/di/providers.dart';
@@ -64,7 +68,7 @@ class _TenantFormState extends ConsumerState<TenantFormScreen> {
     }
     setState(() => busy = true);
     try {
-      final repository = ref.read(repositoryProvider);
+      final repository = ref.read(operationsViewModelProvider);
       final idProofUrl = idProof == null
           ? null
           : await repository.upload(
@@ -303,201 +307,187 @@ class TenantDetailScreen extends ConsumerWidget {
   const TenantDetailScreen({super.key, required this.id});
   final String id;
   @override
-  Widget build(BuildContext context, WidgetRef ref) => FutureBuilder<Resident>(
-    future: ref.read(repositoryProvider).resident(id),
-    builder: (context, snapshot) {
-      if (!snapshot.hasData) {
-        return Scaffold(
-          appBar: const PgHeader(title: 'Tenant'),
-          body: Center(
-            child: Text(
-              snapshot.hasError ? snapshot.error.toString() : 'Loading…',
-            ),
-          ),
-        );
-      }
-      final person = snapshot.data!;
-      return DefaultTabController(
-        length: 4,
-        child: Scaffold(
-          appBar: AppBar(
-            title: Text('${person.firstName} ${person.lastName ?? ''}'),
-            bottom: const TabBar(
-              isScrollable: true,
-              tabs: [
-                Tab(text: 'Joining form'),
-                Tab(text: 'Profile'),
-                Tab(text: 'Passbook'),
-                Tab(text: 'Activity'),
-              ],
-            ),
-          ),
-          body: TabBarView(
-            children: [
-              _JoiningForm(person),
-              ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  PgCard(
-                    child: Column(
-                      children: [
-                        CircleAvatar(
-                          radius: 28,
-                          child: Text(person.firstName[0]),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          '${person.firstName} ${person.lastName ?? ''}',
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        Text(
-                          'Rent ${rupees(person.monthlyRent)} • Joined ${person.joiningDate?.substring(0, 10) ?? '—'}',
-                        ),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            IconButton(
-                              tooltip: 'Call',
-                              onPressed: () => launchUrl(
-                                Uri(scheme: 'tel', path: person.mobile),
-                              ),
-                              icon: const Icon(Icons.call),
-                            ),
-                            IconButton(
-                              tooltip: 'WhatsApp',
-                              onPressed: () => context.push(
-                                '/action/message?residentId=${person.id}',
-                              ),
-                              icon: const Icon(Icons.chat),
-                            ),
-                            IconButton(
-                              tooltip: 'Edit',
-                              onPressed: () => context.push(
-                                '/action/edit-tenant?residentId=${person.id}',
-                              ),
-                              icon: const Icon(Icons.edit),
-                            ),
-                            IconButton(
-                              tooltip: 'Invite',
-                              onPressed: () => SharePlus.instance.share(
-                                ShareParams(
-                                  text:
-                                      'Hi ${person.firstName}, access your PgInfo tenant account using mobile ${person.mobile}.',
-                                  subject: 'PgInfo invitation',
-                                ),
-                              ),
-                              icon: const Icon(Icons.person_add_alt_1),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  const _SectionTitle('Personal details'),
-                  ListTile(
-                    title: const Text('Mobile'),
-                    subtitle: Text(person.mobile),
-                  ),
-                  if (person.email != null)
-                    ListTile(
-                      title: const Text('Email'),
-                      subtitle: Text(person.email!),
-                    ),
-                  if (person.whatsappNumber != null)
-                    ListTile(
-                      title: const Text('WhatsApp'),
-                      subtitle: Text(person.whatsappNumber!),
-                    ),
-                  ListTile(
-                    title: const Text('Profession'),
-                    subtitle: Text(person.profession ?? 'OTHER'),
-                  ),
-                  if (person.permanentAddress != null)
-                    ListTile(
-                      title: const Text('Permanent address'),
-                      subtitle: Text(person.permanentAddress!),
-                    ),
-                  const _SectionTitle('Rental details'),
-                  ListTile(
-                    title: const Text('Room'),
-                    subtitle: Text(
-                      person.room == null
-                          ? 'Not allocated'
-                          : 'Room ${person.room!.roomNumber}${person.bed == null ? '' : ' • Bed ${person.bed!.bedNumber}'}',
-                    ),
-                  ),
-                  ListTile(
-                    title: const Text('Status'),
-                    subtitle: Text(person.status ?? '—'),
-                  ),
-                  ListTile(
-                    title: const Text('Security deposit'),
-                    subtitle: Text(rupees(person.securityDeposit)),
-                  ),
-                  ListTile(
-                    title: const Text('Rent due day'),
-                    subtitle: Text(
-                      '${person.rentDueDay ?? 'Property default'}',
-                    ),
-                  ),
-                  const _SectionTitle('Parent and emergency details'),
-                  ListTile(
-                    title: const Text('Parent'),
-                    subtitle: Text(person.parentName ?? 'Not provided'),
-                  ),
-                  ListTile(
-                    title: const Text('Parent phone'),
-                    subtitle: Text(person.parentPhone ?? 'Not provided'),
-                  ),
-                  ListTile(
-                    title: const Text('Emergency contact'),
-                    subtitle: Text(person.emergencyContact ?? 'Not provided'),
-                  ),
-                  const _SectionTitle('Documents'),
-                  ListTile(
-                    leading: const Icon(Icons.badge_outlined),
-                    title: const Text('ID proof'),
-                    subtitle: Text(
-                      person.idProofUrl == null
-                          ? 'Not uploaded'
-                          : 'View document',
-                    ),
-                    onTap: person.idProofUrl == null
-                        ? null
-                        : () => launchUrl(
-                            Uri.parse(person.idProofUrl!),
-                            mode: LaunchMode.externalApplication,
-                          ),
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.description_outlined),
-                    title: const Text('Rental agreement'),
-                    subtitle: Text(
-                      person.agreementUrl == null
-                          ? 'Not uploaded'
-                          : 'View document',
-                    ),
-                    onTap: person.agreementUrl == null
-                        ? null
-                        : () => launchUrl(
-                            Uri.parse(person.agreementUrl!),
-                            mode: LaunchMode.externalApplication,
-                          ),
-                  ),
-                  FilledButton(
-                    onPressed: () =>
-                        context.push('/action/due?residentId=${person.id}'),
-                    child: const Text('Add due'),
-                  ),
-                ],
-              ),
-              _Passbook(id),
-              _Activity(entityType: 'Resident', entityId: id),
+  Widget build(BuildContext context, WidgetRef ref) => PgAsync(
+    value: ref.watch(residentProvider(id)),
+    retry: () => ref.invalidate(residentProvider(id)),
+    data: (person) => DefaultTabController(
+      length: 4,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text('${person.firstName} ${person.lastName ?? ''}'),
+          bottom: const TabBar(
+            isScrollable: true,
+            tabs: [
+              Tab(text: 'Joining form'),
+              Tab(text: 'Profile'),
+              Tab(text: 'Passbook'),
+              Tab(text: 'Activity'),
             ],
           ),
         ),
-      );
-    },
+        body: TabBarView(
+          children: [
+            _JoiningForm(person),
+            ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                PgCard(
+                  child: Column(
+                    children: [
+                      CircleAvatar(
+                        radius: 28,
+                        child: Text(person.firstName[0]),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '${person.firstName} ${person.lastName ?? ''}',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      Text(
+                        'Rent ${rupees(person.monthlyRent)} • Joined ${person.joiningDate?.substring(0, 10) ?? '—'}',
+                      ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          IconButton(
+                            tooltip: 'Call',
+                            onPressed: () => launchUrl(
+                              Uri(scheme: 'tel', path: person.mobile),
+                            ),
+                            icon: const Icon(Icons.call),
+                          ),
+                          IconButton(
+                            tooltip: 'WhatsApp',
+                            onPressed: () => context.push(
+                              '/action/message?residentId=${person.id}',
+                            ),
+                            icon: const Icon(Icons.chat),
+                          ),
+                          IconButton(
+                            tooltip: 'Edit',
+                            onPressed: () => context.push(
+                              '/action/edit-tenant?residentId=${person.id}',
+                            ),
+                            icon: const Icon(Icons.edit),
+                          ),
+                          IconButton(
+                            tooltip: 'Invite',
+                            onPressed: () => SharePlus.instance.share(
+                              ShareParams(
+                                text:
+                                    'Hi ${person.firstName}, access your PgInfo tenant account using mobile ${person.mobile}.',
+                                subject: 'PgInfo invitation',
+                              ),
+                            ),
+                            icon: const Icon(Icons.person_add_alt_1),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const _SectionTitle('Personal details'),
+                ListTile(
+                  title: const Text('Mobile'),
+                  subtitle: Text(person.mobile),
+                ),
+                if (person.email != null)
+                  ListTile(
+                    title: const Text('Email'),
+                    subtitle: Text(person.email!),
+                  ),
+                if (person.whatsappNumber != null)
+                  ListTile(
+                    title: const Text('WhatsApp'),
+                    subtitle: Text(person.whatsappNumber!),
+                  ),
+                ListTile(
+                  title: const Text('Profession'),
+                  subtitle: Text(person.profession ?? 'OTHER'),
+                ),
+                if (person.permanentAddress != null)
+                  ListTile(
+                    title: const Text('Permanent address'),
+                    subtitle: Text(person.permanentAddress!),
+                  ),
+                const _SectionTitle('Rental details'),
+                ListTile(
+                  title: const Text('Room'),
+                  subtitle: Text(
+                    person.room == null
+                        ? 'Not allocated'
+                        : 'Room ${person.room!.roomNumber}${person.bed == null ? '' : ' • Bed ${person.bed!.bedNumber}'}',
+                  ),
+                ),
+                ListTile(
+                  title: const Text('Status'),
+                  subtitle: Text(person.status ?? '—'),
+                ),
+                ListTile(
+                  title: const Text('Security deposit'),
+                  subtitle: Text(rupees(person.securityDeposit)),
+                ),
+                ListTile(
+                  title: const Text('Rent due day'),
+                  subtitle: Text('${person.rentDueDay ?? 'Property default'}'),
+                ),
+                const _SectionTitle('Parent and emergency details'),
+                ListTile(
+                  title: const Text('Parent'),
+                  subtitle: Text(person.parentName ?? 'Not provided'),
+                ),
+                ListTile(
+                  title: const Text('Parent phone'),
+                  subtitle: Text(person.parentPhone ?? 'Not provided'),
+                ),
+                ListTile(
+                  title: const Text('Emergency contact'),
+                  subtitle: Text(person.emergencyContact ?? 'Not provided'),
+                ),
+                const _SectionTitle('Documents'),
+                ListTile(
+                  leading: const Icon(Icons.badge_outlined),
+                  title: const Text('ID proof'),
+                  subtitle: Text(
+                    person.idProofUrl == null
+                        ? 'Not uploaded'
+                        : 'View document',
+                  ),
+                  onTap: person.idProofUrl == null
+                      ? null
+                      : () => launchUrl(
+                          Uri.parse(person.idProofUrl!),
+                          mode: LaunchMode.externalApplication,
+                        ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.description_outlined),
+                  title: const Text('Rental agreement'),
+                  subtitle: Text(
+                    person.agreementUrl == null
+                        ? 'Not uploaded'
+                        : 'View document',
+                  ),
+                  onTap: person.agreementUrl == null
+                      ? null
+                      : () => launchUrl(
+                          Uri.parse(person.agreementUrl!),
+                          mode: LaunchMode.externalApplication,
+                        ),
+                ),
+                FilledButton(
+                  onPressed: () =>
+                      context.push('/action/due?residentId=${person.id}'),
+                  child: const Text('Add due'),
+                ),
+              ],
+            ),
+            _Passbook(id),
+            _Activity(entityType: 'Resident', entityId: id),
+          ],
+        ),
+      ),
+    ),
   );
 }
 
@@ -544,9 +534,32 @@ Tenant reference: ${person.id}''';
         ),
       ),
       FilledButton.icon(
-        onPressed: () => SharePlus.instance.share(
-          ShareParams(text: content, subject: 'Tenant joining form'),
-        ),
+        onPressed: () async {
+          try {
+            final document = pw.Document();
+            document.addPage(
+              pw.MultiPage(
+                build: (_) => [
+                  pw.Header(level: 0, text: 'PgInfo tenant joining form'),
+                  pw.Text(content.replaceAll('₹', 'INR ')),
+                ],
+              ),
+            );
+            final directory = await getTemporaryDirectory();
+            final file = File(
+              '${directory.path}${Platform.pathSeparator}joining-form-${person.id}.pdf',
+            );
+            await file.writeAsBytes(await document.save(), flush: true);
+            await SharePlus.instance.share(
+              ShareParams(
+                files: [XFile(file.path, mimeType: 'application/pdf')],
+                subject: 'Tenant joining form',
+              ),
+            );
+          } catch (error) {
+            if (context.mounted) showError(context, error);
+          }
+        },
         icon: const Icon(Icons.download_outlined),
         label: const Text('Download or share'),
       ),
@@ -560,37 +573,32 @@ class _Activity extends ConsumerWidget {
   final String entityId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) =>
-      FutureBuilder<List<Map<String, dynamic>>>(
-        future: ref.read(repositoryProvider).activity(entityType, entityId),
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return Center(child: Text(snapshot.error.toString()));
-          }
-          if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.data!.isEmpty) {
-            return const Center(child: Text('No activity recorded yet'));
-          }
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: snapshot.data!.length,
-            itemBuilder: (context, index) {
-              final event = snapshot.data![index];
-              return PgCard(
-                child: ListTile(
-                  leading: const Icon(Icons.history),
-                  title: Text(
-                    '${event['action']}'.replaceAll('.', ' ').toUpperCase(),
-                  ),
-                  subtitle: Text('${event['createdAt']}'),
-                ),
-              );
-            },
+  Widget build(BuildContext context, WidgetRef ref) => PgAsync(
+    value: ref.watch(
+      activityProvider((entityType: entityType, entityId: entityId)),
+    ),
+    data: (events) {
+      if (events.isEmpty) {
+        return const Center(child: Text('No activity recorded yet'));
+      }
+      return ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: events.length,
+        itemBuilder: (context, index) {
+          final event = events[index];
+          return PgCard(
+            child: ListTile(
+              leading: const Icon(Icons.history),
+              title: Text(
+                '${event['action']}'.replaceAll('.', ' ').toUpperCase(),
+              ),
+              subtitle: Text('${event['createdAt']}'),
+            ),
           );
         },
       );
+    },
+  );
 }
 
 class _Passbook extends ConsumerWidget {

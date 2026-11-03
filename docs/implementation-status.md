@@ -1,6 +1,6 @@
 # Implementation status
 
-This repository started with the Flutter counter template. The current client is a substantial first implementation. The critical local API workflow was validated on 3 November 2026; production distribution still requires the release items below.
+This repository started with the Flutter counter template. The current client and supporting backend contracts implement the requested operational workflows. The critical local API workflow was validated on 3 November 2026; production distribution requires environment-owned credentials listed below.
 
 ## Connected flows
 
@@ -11,17 +11,18 @@ This repository started with the Flutter counter template. The current client is
 - Dashboard metrics with validated month selection, reports CSV viewing/copying, receipt viewing/copying, entity activity history, and deep route paths.
 - Lead editing, property staff creation/editing, complaint status management and announcement history.
 - Tenant joining forms generated from authoritative tenant data with platform download/share support.
+- Debounced server search and reusable Riverpod pagination for rooms, tenants, leads, staff, dues, collections and expenses.
+- Persistent payment-proof, expense-receipt and tenant-document upload flows through a guarded Cloudinary adapter. The adapter fails closed when provider credentials are absent.
+- Expanded tenant personal, rental, parent and document sections, plus complete create/edit forms.
+- Sentry-compatible Dart crash reporting, custom deep links, production application identifiers and secret-driven Android signing/release automation.
 - Live local validation covers registration, refresh-token rotation, property/room/bed creation, tenant onboarding, dues, partial payment allocation, idempotency conflict handling, receipt retrieval, expenses, leads, complaint resolution, announcements, CSV reports and dashboard metrics.
 - A live concurrent allocation check returned one 201 and one 409 for the same bed. Property-local date handling was also verified across the UTC/Asia-Kolkata boundary.
 
-## Remaining release work
+## Environment handoff required for distribution
 
-- Repeat the validated workflow against a dedicated staging environment before release; the current run used the local development database.
-- Offset paginated lists currently show the first page. Infinite scrolling and server search should be added for high volume lists before a large rollout. Rooms are returned as an unpaginated property list by the backend.
-- Several screens still use repositories directly from widget state. Move asynchronous coordination into dedicated feature ViewModels and repository interfaces to complete the requested MVVM boundaries.
-- Add persistent attachment uploads to the backend. Images can currently be selected and shared locally.
-- Receipt details are shared as text; CSV reports are materialized as files and handed to the platform save/share sheet. WhatsApp images also use the platform share sheet, which cannot force the target app.
-- Expand server-backed statistics and filter variants where the backend currently exposes only aggregate dashboard metrics.
-- Add larger test suites, staging contract tests, integration tests, accessibility audits, crash monitoring, app signing, and an actual production API URL.
+- Configure `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY` and `CLOUDINARY_API_SECRET`; uploads deliberately return 503 while placeholder or missing credentials are present.
+- Configure the GitHub `staging` environment secrets and run the **Staging contract** workflow against the real HTTPS staging service.
+- Configure the GitHub `production` environment API URL, Sentry DSN and Android upload-keystore secrets, then run **Mobile production release** to produce the signed, obfuscated AAB and symbols.
+- Configure the corresponding Apple team, certificates and App Store provisioning profile when an iOS build is distributed.
 
-No production readiness claim should be made until these items are complete and verified with the running backend.
+These are credentials and external environments, not unfinished code paths; they cannot be safely committed to the repository.

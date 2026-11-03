@@ -252,7 +252,7 @@ class OrganizationSelectScreen extends ConsumerWidget {
               onTap: () async {
                 try {
                   await ref
-                      .read(repositoryProvider)
+                      .read(operationsViewModelProvider)
                       .switchOrganization(org['id'] as String);
                   ref
                       .read(selectedOrganizationProvider.notifier)

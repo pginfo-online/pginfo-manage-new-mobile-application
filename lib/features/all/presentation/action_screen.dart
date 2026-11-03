@@ -49,7 +49,7 @@ class _ActionState extends ConsumerState<ActionScreen> {
       Future.microtask(() async {
         try {
           final person = await ref
-              .read(repositoryProvider)
+              .read(operationsViewModelProvider)
               .residentDetails(selectedResident!);
           if (!mounted) return;
           for (final key in [
@@ -79,7 +79,7 @@ class _ActionState extends ConsumerState<ActionScreen> {
       Future.microtask(() async {
         try {
           final expense = await ref
-              .read(repositoryProvider)
+              .read(operationsViewModelProvider)
               .expense(widget.query['id']!);
           if (!mounted) return;
           field('amount').text = ((expense['amount'] as num) / 100)
@@ -103,7 +103,7 @@ class _ActionState extends ConsumerState<ActionScreen> {
       Future.microtask(() async {
         try {
           final lead = await ref
-              .read(repositoryProvider)
+              .read(operationsViewModelProvider)
               .lead(widget.query['id']!);
           if (!mounted) return;
           for (final key in [
@@ -130,7 +130,7 @@ class _ActionState extends ConsumerState<ActionScreen> {
       Future.microtask(() async {
         try {
           final staff = await ref
-              .read(repositoryProvider)
+              .read(operationsViewModelProvider)
               .staff(widget.query['id']!);
           if (!mounted) return;
           for (final key in [
@@ -270,7 +270,7 @@ class _ActionState extends ConsumerState<ActionScreen> {
   );
   Future<void> save() async {
     if (!form.currentState!.validate()) return;
-    final repo = ref.read(repositoryProvider),
+    final repo = ref.read(operationsViewModelProvider),
         property = ref.read(selectedPropertyProvider);
     setState(() => busy = true);
     try {
@@ -842,7 +842,7 @@ class _CategorySelect extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) =>
       FutureBuilder<List<Map<String, dynamic>>>(
-        future: ref.read(repositoryProvider).list(path),
+        future: ref.read(operationsViewModelProvider).list(path),
         builder: (context, snap) => Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: DropdownButtonFormField<String>(
@@ -900,7 +900,9 @@ class _MessageState extends ConsumerState<_MessageScreen> {
       body: FutureBuilder<Resident?>(
         future: widget.residentId == null
             ? Future.value(null)
-            : ref.read(repositoryProvider).resident(widget.residentId!),
+            : ref
+                  .read(operationsViewModelProvider)
+                  .resident(widget.residentId!),
         builder: (context, snap) {
           if (phone.text.isEmpty && snap.data?.mobile != null) {
             phone.text = snap.data!.mobile;
@@ -992,7 +994,7 @@ class _ReminderScreen extends ConsumerWidget {
       child: FilledButton(
         onPressed: () async {
           try {
-            await ref.read(repositoryProvider).create(
+            await ref.read(operationsViewModelProvider).create(
               '/announcements/reminders/rent',
               {
                 if (ref.read(selectedPropertyProvider) != null)
@@ -1022,7 +1024,7 @@ class _ComplaintListScreen extends ConsumerWidget {
     ),
     body: FutureBuilder<List<Map<String, dynamic>>>(
       future: ref
-          .read(repositoryProvider)
+          .read(operationsViewModelProvider)
           .list(
             '/complaints',
             query: {
@@ -1068,7 +1070,7 @@ class _ComplaintDetailState extends ConsumerState<_ComplaintDetailScreen> {
   @override
   void initState() {
     super.initState();
-    future = ref.read(repositoryProvider).complaint(widget.id ?? '');
+    future = ref.read(operationsViewModelProvider).complaint(widget.id ?? '');
   }
 
   @override
@@ -1078,7 +1080,9 @@ class _ComplaintDetailState extends ConsumerState<_ComplaintDetailScreen> {
   }
 
   void reload() => setState(
-    () => future = ref.read(repositoryProvider).complaint(widget.id ?? ''),
+    () => future = ref
+        .read(operationsViewModelProvider)
+        .complaint(widget.id ?? ''),
   );
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -1156,7 +1160,7 @@ class _ComplaintDetailState extends ConsumerState<_ComplaintDetailScreen> {
                       onChanged: (status) async {
                         if (status == null) return;
                         try {
-                          await ref.read(repositoryProvider).update(
+                          await ref.read(operationsViewModelProvider).update(
                             '/complaints/${widget.id}/status',
                             {
                               'status': status,
@@ -1205,7 +1209,7 @@ class _NotificationsScreen extends ConsumerWidget {
     appBar: const PgHeader(title: 'Notifications'),
     body: FutureBuilder<List<Map<String, dynamic>>>(
       future: ref
-          .read(repositoryProvider)
+          .read(operationsViewModelProvider)
           .list(
             '/announcements',
             query: {
@@ -1245,7 +1249,7 @@ class _ReceiptScreen extends ConsumerWidget {
     body: id == null
         ? const Center(child: Text('Receipt unavailable'))
         : FutureBuilder<dynamic>(
-            future: ref.read(repositoryProvider).receipt(id!),
+            future: ref.read(operationsViewModelProvider).receipt(id!),
             builder: (context, snap) {
               if (snap.hasError) {
                 return Center(child: Text(snap.error.toString()));
@@ -1336,7 +1340,7 @@ class _ReportScreen extends ConsumerWidget {
     return Scaffold(
       appBar: PgHeader(title: '$safeType report'),
       body: FutureBuilder<dynamic>(
-        future: ref.read(repositoryProvider).report(safeType),
+        future: ref.read(operationsViewModelProvider).report(safeType),
         builder: (context, snap) {
           if (snap.hasError) return Center(child: Text(snap.error.toString()));
           if (!snap.hasData) {
@@ -1411,7 +1415,7 @@ class _PaymentSummary extends ConsumerWidget {
     WidgetRef ref,
   ) => FutureBuilder<List<Map<String, dynamic>>>(
     future: ref
-        .read(repositoryProvider)
+        .read(operationsViewModelProvider)
         .list('/billing/records', query: {'residentId': residentId}),
     builder: (context, snap) {
       if (!snap.hasData) return const SizedBox.shrink();
