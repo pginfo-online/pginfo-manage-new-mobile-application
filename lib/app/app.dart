@@ -7,10 +7,13 @@ import 'di/providers.dart';
 import '../features/authentication/presentation/login_screen.dart';
 import '../features/home/presentation/home_screen.dart';
 import '../features/property/presentation/property_screens.dart';
+import '../features/property/presentation/property_dashboard_screen.dart';
+import '../features/property/presentation/room_form_screen.dart';
 import '../features/people/presentation/people_screen.dart';
 import '../features/money/presentation/money_screen.dart';
 import '../features/analytics/presentation/analytics_screen.dart';
 import '../features/tenants/presentation/tenant_screens.dart';
+import '../features/tenants/presentation/add_tenant_screen.dart';
 import '../features/all/presentation/all_screen.dart';
 import '../features/all/presentation/action_screen.dart';
 
@@ -64,7 +67,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/property',
-                builder: (context, state) => const PropertyScreen(),
+                builder: (context, state) => const PropertyDashboardScreen(),
               ),
             ],
           ),
@@ -84,7 +87,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/rooms/new',
-        builder: (context, state) => const RoomFormScreen(),
+        builder: (context, state) => const RedesignedRoomFormScreen(),
+      ),
+      GoRoute(
+        path: '/rooms/:id/edit',
+        builder: (context, state) =>
+            RedesignedRoomFormScreen(id: state.pathParameters['id']),
       ),
       GoRoute(
         path: '/rooms/filter',
@@ -97,7 +105,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/tenants/new',
-        builder: (context, state) => const TenantFormScreen(),
+        builder: (context, state) => AddTenantScreen(
+          initialRoomId: state.uri.queryParameters['roomId'],
+          initialBedId: state.uri.queryParameters['bedId'],
+        ),
       ),
       GoRoute(
         path: '/tenants/:id',

@@ -9,6 +9,7 @@ abstract class Property with _$Property {
     required String name,
     required String type,
     String? city,
+    @Default(0) int roomCount,
   }) = _Property;
   factory Property.fromJson(Map<String, dynamic> json) =>
       _$PropertyFromJson(json);
@@ -19,6 +20,7 @@ abstract class Room with _$Room {
   const factory Room({
     required String id,
     required String roomNumber,
+    @Default('0') String floor,
     required String sharingType,
     required int rentAmount,
     required String status,
@@ -30,6 +32,9 @@ abstract class Room with _$Room {
     PropertySummary? property,
     @Default([]) List<Bed> beds,
     @Default([]) List<String> images,
+    @Default([]) List<String> amenities,
+    String? description,
+    String? remarks,
   }) = _Room;
   factory Room.fromJson(Map<String, dynamic> json) => _$RoomFromJson(json);
 }
@@ -46,12 +51,13 @@ abstract class PropertySummary with _$PropertySummary {
       _$PropertySummaryFromJson(json);
 }
 
-@freezed
+@Freezed(makeCollectionsUnmodifiable: false)
 abstract class Bed with _$Bed {
   const factory Bed({
     required String id,
     required String bedNumber,
     required String status,
+    @Default([]) List<Resident> residents,
   }) = _Bed;
   factory Bed.fromJson(Map<String, dynamic> json) => _$BedFromJson(json);
 }

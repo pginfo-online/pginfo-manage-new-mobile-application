@@ -277,11 +277,8 @@ class PropertySelectScreen extends ConsumerWidget {
             PgCard(
               onTap: () {
                 ref.read(selectedPropertyProvider.notifier).select(p.id);
-                ref.invalidate(roomsProvider);
-                ref.invalidate(residentsProvider);
-                ref.invalidate(dashboardProvider);
-                ref.invalidate(globalSearchProvider);
-                ref.invalidate(tenantLedgerProvider);
+                ref.read(roomSearchProvider.notifier).set('');
+                ref.read(roomFloorProvider.notifier).set(null);
                 context.go('/property');
               },
               child: Row(
@@ -468,6 +465,10 @@ class _RoomFilterState extends ConsumerState<RoomFilterScreen> {
         'FOUR_SHARING',
         'FIVE_SHARING',
         'SIX_SHARING',
+        'SEVEN_SHARING',
+        'EIGHT_SHARING',
+        'NINE_SHARING',
+        'TEN_SHARING',
       ],
       'Room status': [
         'AVAILABLE',

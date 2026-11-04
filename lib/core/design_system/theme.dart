@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 
 class PgTheme {
   static const blue = Color(0xff3156f5);
+  static const analyticsCanvas = Color(0xfff7f7fb);
+  static const positive = Color(0xff13bd88);
+  static const negative = Color(0xffed747b);
+  static const analyticsInk = Color(0xff171923);
   static const canvas = Color(0xfff1f4ff);
   static ThemeData build(Brightness brightness) {
     final dark = brightness == Brightness.dark;

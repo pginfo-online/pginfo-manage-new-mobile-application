@@ -15,7 +15,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$Property {
 
- String get id; String get name; String get type; String? get city;
+ String get id; String get name; String get type; String? get city; int get roomCount;
 /// Create a copy of Property
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -28,16 +28,16 @@ $PropertyCopyWith<Property> get copyWith => _$PropertyCopyWithImpl<Property>(thi
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is Property&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.type, type) || other.type == type)&&(identical(other.city, city) || other.city == city));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is Property&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.type, type) || other.type == type)&&(identical(other.city, city) || other.city == city)&&(identical(other.roomCount, roomCount) || other.roomCount == roomCount));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,name,type,city);
+int get hashCode => Object.hash(runtimeType,id,name,type,city,roomCount);
 
 @override
 String toString() {
-  return 'Property(id: $id, name: $name, type: $type, city: $city)';
+  return 'Property(id: $id, name: $name, type: $type, city: $city, roomCount: $roomCount)';
 }
 
 
@@ -48,7 +48,7 @@ abstract mixin class $PropertyCopyWith<$Res>  {
   factory $PropertyCopyWith(Property value, $Res Function(Property) _then) = _$PropertyCopyWithImpl;
 @useResult
 $Res call({
- String id, String name, String type, String? city
+ String id, String name, String type, String? city, int roomCount
 });
 
 
@@ -65,13 +65,14 @@ class _$PropertyCopyWithImpl<$Res>
 
 /// Create a copy of Property
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? name = null,Object? type = null,Object? city = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? name = null,Object? type = null,Object? city = freezed,Object? roomCount = null,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
 as String,type: null == type ? _self.type : type // ignore: cast_nullable_to_non_nullable
 as String,city: freezed == city ? _self.city : city // ignore: cast_nullable_to_non_nullable
-as String?,
+as String?,roomCount: null == roomCount ? _self.roomCount : roomCount // ignore: cast_nullable_to_non_nullable
+as int,
   ));
 }
 
@@ -156,10 +157,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String name,  String type,  String? city)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String name,  String type,  String? city,  int roomCount)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _Property() when $default != null:
-return $default(_that.id,_that.name,_that.type,_that.city);case _:
+return $default(_that.id,_that.name,_that.type,_that.city,_that.roomCount);case _:
   return orElse();
 
 }
@@ -177,10 +178,10 @@ return $default(_that.id,_that.name,_that.type,_that.city);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String name,  String type,  String? city)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String name,  String type,  String? city,  int roomCount)  $default,) {final _that = this;
 switch (_that) {
 case _Property():
-return $default(_that.id,_that.name,_that.type,_that.city);case _:
+return $default(_that.id,_that.name,_that.type,_that.city,_that.roomCount);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -197,10 +198,10 @@ return $default(_that.id,_that.name,_that.type,_that.city);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String name,  String type,  String? city)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String name,  String type,  String? city,  int roomCount)?  $default,) {final _that = this;
 switch (_that) {
 case _Property() when $default != null:
-return $default(_that.id,_that.name,_that.type,_that.city);case _:
+return $default(_that.id,_that.name,_that.type,_that.city,_that.roomCount);case _:
   return null;
 
 }
@@ -212,13 +213,14 @@ return $default(_that.id,_that.name,_that.type,_that.city);case _:
 @JsonSerializable()
 
 class _Property implements Property {
-  const _Property({required this.id, required this.name, required this.type, this.city});
+  const _Property({required this.id, required this.name, required this.type, this.city, this.roomCount = 0});
   factory _Property.fromJson(Map<String, dynamic> json) => _$PropertyFromJson(json);
 
 @override final  String id;
 @override final  String name;
 @override final  String type;
 @override final  String? city;
+@override@JsonKey() final  int roomCount;
 
 /// Create a copy of Property
 /// with the given fields replaced by the non-null parameter values.
@@ -233,16 +235,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Property&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.type, type) || other.type == type)&&(identical(other.city, city) || other.city == city));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Property&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.type, type) || other.type == type)&&(identical(other.city, city) || other.city == city)&&(identical(other.roomCount, roomCount) || other.roomCount == roomCount));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,name,type,city);
+int get hashCode => Object.hash(runtimeType,id,name,type,city,roomCount);
 
 @override
 String toString() {
-  return 'Property(id: $id, name: $name, type: $type, city: $city)';
+  return 'Property(id: $id, name: $name, type: $type, city: $city, roomCount: $roomCount)';
 }
 
 
@@ -253,7 +255,7 @@ abstract mixin class _$PropertyCopyWith<$Res> implements $PropertyCopyWith<$Res>
   factory _$PropertyCopyWith(_Property value, $Res Function(_Property) _then) = __$PropertyCopyWithImpl;
 @override @useResult
 $Res call({
- String id, String name, String type, String? city
+ String id, String name, String type, String? city, int roomCount
 });
 
 
@@ -270,13 +272,14 @@ class __$PropertyCopyWithImpl<$Res>
 
 /// Create a copy of Property
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? name = null,Object? type = null,Object? city = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? name = null,Object? type = null,Object? city = freezed,Object? roomCount = null,}) {
   return _then(_Property(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
 as String,type: null == type ? _self.type : type // ignore: cast_nullable_to_non_nullable
 as String,city: freezed == city ? _self.city : city // ignore: cast_nullable_to_non_nullable
-as String?,
+as String?,roomCount: null == roomCount ? _self.roomCount : roomCount // ignore: cast_nullable_to_non_nullable
+as int,
   ));
 }
 
@@ -287,7 +290,7 @@ as String?,
 /// @nodoc
 mixin _$Room {
 
- String get id; String get roomNumber; String get sharingType; int get rentAmount; String get status; String get gender; String get unitType; bool get isDisabledForRent; bool get isPublished; String? get availableFrom; PropertySummary? get property; List<Bed> get beds; List<String> get images;
+ String get id; String get roomNumber; String get floor; String get sharingType; int get rentAmount; String get status; String get gender; String get unitType; bool get isDisabledForRent; bool get isPublished; String? get availableFrom; PropertySummary? get property; List<Bed> get beds; List<String> get images; List<String> get amenities; String? get description; String? get remarks;
 /// Create a copy of Room
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -300,16 +303,16 @@ $RoomCopyWith<Room> get copyWith => _$RoomCopyWithImpl<Room>(this as Room, _$ide
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is Room&&(identical(other.id, id) || other.id == id)&&(identical(other.roomNumber, roomNumber) || other.roomNumber == roomNumber)&&(identical(other.sharingType, sharingType) || other.sharingType == sharingType)&&(identical(other.rentAmount, rentAmount) || other.rentAmount == rentAmount)&&(identical(other.status, status) || other.status == status)&&(identical(other.gender, gender) || other.gender == gender)&&(identical(other.unitType, unitType) || other.unitType == unitType)&&(identical(other.isDisabledForRent, isDisabledForRent) || other.isDisabledForRent == isDisabledForRent)&&(identical(other.isPublished, isPublished) || other.isPublished == isPublished)&&(identical(other.availableFrom, availableFrom) || other.availableFrom == availableFrom)&&(identical(other.property, property) || other.property == property)&&const DeepCollectionEquality().equals(other.beds, beds)&&const DeepCollectionEquality().equals(other.images, images));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is Room&&(identical(other.id, id) || other.id == id)&&(identical(other.roomNumber, roomNumber) || other.roomNumber == roomNumber)&&(identical(other.floor, floor) || other.floor == floor)&&(identical(other.sharingType, sharingType) || other.sharingType == sharingType)&&(identical(other.rentAmount, rentAmount) || other.rentAmount == rentAmount)&&(identical(other.status, status) || other.status == status)&&(identical(other.gender, gender) || other.gender == gender)&&(identical(other.unitType, unitType) || other.unitType == unitType)&&(identical(other.isDisabledForRent, isDisabledForRent) || other.isDisabledForRent == isDisabledForRent)&&(identical(other.isPublished, isPublished) || other.isPublished == isPublished)&&(identical(other.availableFrom, availableFrom) || other.availableFrom == availableFrom)&&(identical(other.property, property) || other.property == property)&&const DeepCollectionEquality().equals(other.beds, beds)&&const DeepCollectionEquality().equals(other.images, images)&&const DeepCollectionEquality().equals(other.amenities, amenities)&&(identical(other.description, description) || other.description == description)&&(identical(other.remarks, remarks) || other.remarks == remarks));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,roomNumber,sharingType,rentAmount,status,gender,unitType,isDisabledForRent,isPublished,availableFrom,property,const DeepCollectionEquality().hash(beds),const DeepCollectionEquality().hash(images));
+int get hashCode => Object.hash(runtimeType,id,roomNumber,floor,sharingType,rentAmount,status,gender,unitType,isDisabledForRent,isPublished,availableFrom,property,const DeepCollectionEquality().hash(beds),const DeepCollectionEquality().hash(images),const DeepCollectionEquality().hash(amenities),description,remarks);
 
 @override
 String toString() {
-  return 'Room(id: $id, roomNumber: $roomNumber, sharingType: $sharingType, rentAmount: $rentAmount, status: $status, gender: $gender, unitType: $unitType, isDisabledForRent: $isDisabledForRent, isPublished: $isPublished, availableFrom: $availableFrom, property: $property, beds: $beds, images: $images)';
+  return 'Room(id: $id, roomNumber: $roomNumber, floor: $floor, sharingType: $sharingType, rentAmount: $rentAmount, status: $status, gender: $gender, unitType: $unitType, isDisabledForRent: $isDisabledForRent, isPublished: $isPublished, availableFrom: $availableFrom, property: $property, beds: $beds, images: $images, amenities: $amenities, description: $description, remarks: $remarks)';
 }
 
 
@@ -320,7 +323,7 @@ abstract mixin class $RoomCopyWith<$Res>  {
   factory $RoomCopyWith(Room value, $Res Function(Room) _then) = _$RoomCopyWithImpl;
 @useResult
 $Res call({
- String id, String roomNumber, String sharingType, int rentAmount, String status, String gender, String unitType, bool isDisabledForRent, bool isPublished, String? availableFrom, PropertySummary? property, List<Bed> beds, List<String> images
+ String id, String roomNumber, String floor, String sharingType, int rentAmount, String status, String gender, String unitType, bool isDisabledForRent, bool isPublished, String? availableFrom, PropertySummary? property, List<Bed> beds, List<String> images, List<String> amenities, String? description, String? remarks
 });
 
 
@@ -337,10 +340,11 @@ class _$RoomCopyWithImpl<$Res>
 
 /// Create a copy of Room
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? roomNumber = null,Object? sharingType = null,Object? rentAmount = null,Object? status = null,Object? gender = null,Object? unitType = null,Object? isDisabledForRent = null,Object? isPublished = null,Object? availableFrom = freezed,Object? property = freezed,Object? beds = null,Object? images = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? roomNumber = null,Object? floor = null,Object? sharingType = null,Object? rentAmount = null,Object? status = null,Object? gender = null,Object? unitType = null,Object? isDisabledForRent = null,Object? isPublished = null,Object? availableFrom = freezed,Object? property = freezed,Object? beds = null,Object? images = null,Object? amenities = null,Object? description = freezed,Object? remarks = freezed,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,roomNumber: null == roomNumber ? _self.roomNumber : roomNumber // ignore: cast_nullable_to_non_nullable
+as String,floor: null == floor ? _self.floor : floor // ignore: cast_nullable_to_non_nullable
 as String,sharingType: null == sharingType ? _self.sharingType : sharingType // ignore: cast_nullable_to_non_nullable
 as String,rentAmount: null == rentAmount ? _self.rentAmount : rentAmount // ignore: cast_nullable_to_non_nullable
 as int,status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
@@ -352,7 +356,10 @@ as bool,availableFrom: freezed == availableFrom ? _self.availableFrom : availabl
 as String?,property: freezed == property ? _self.property : property // ignore: cast_nullable_to_non_nullable
 as PropertySummary?,beds: null == beds ? _self.beds : beds // ignore: cast_nullable_to_non_nullable
 as List<Bed>,images: null == images ? _self.images : images // ignore: cast_nullable_to_non_nullable
-as List<String>,
+as List<String>,amenities: null == amenities ? _self.amenities : amenities // ignore: cast_nullable_to_non_nullable
+as List<String>,description: freezed == description ? _self.description : description // ignore: cast_nullable_to_non_nullable
+as String?,remarks: freezed == remarks ? _self.remarks : remarks // ignore: cast_nullable_to_non_nullable
+as String?,
   ));
 }
 /// Create a copy of Room
@@ -449,10 +456,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String roomNumber,  String sharingType,  int rentAmount,  String status,  String gender,  String unitType,  bool isDisabledForRent,  bool isPublished,  String? availableFrom,  PropertySummary? property,  List<Bed> beds,  List<String> images)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String roomNumber,  String floor,  String sharingType,  int rentAmount,  String status,  String gender,  String unitType,  bool isDisabledForRent,  bool isPublished,  String? availableFrom,  PropertySummary? property,  List<Bed> beds,  List<String> images,  List<String> amenities,  String? description,  String? remarks)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _Room() when $default != null:
-return $default(_that.id,_that.roomNumber,_that.sharingType,_that.rentAmount,_that.status,_that.gender,_that.unitType,_that.isDisabledForRent,_that.isPublished,_that.availableFrom,_that.property,_that.beds,_that.images);case _:
+return $default(_that.id,_that.roomNumber,_that.floor,_that.sharingType,_that.rentAmount,_that.status,_that.gender,_that.unitType,_that.isDisabledForRent,_that.isPublished,_that.availableFrom,_that.property,_that.beds,_that.images,_that.amenities,_that.description,_that.remarks);case _:
   return orElse();
 
 }
@@ -470,10 +477,10 @@ return $default(_that.id,_that.roomNumber,_that.sharingType,_that.rentAmount,_th
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String roomNumber,  String sharingType,  int rentAmount,  String status,  String gender,  String unitType,  bool isDisabledForRent,  bool isPublished,  String? availableFrom,  PropertySummary? property,  List<Bed> beds,  List<String> images)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String roomNumber,  String floor,  String sharingType,  int rentAmount,  String status,  String gender,  String unitType,  bool isDisabledForRent,  bool isPublished,  String? availableFrom,  PropertySummary? property,  List<Bed> beds,  List<String> images,  List<String> amenities,  String? description,  String? remarks)  $default,) {final _that = this;
 switch (_that) {
 case _Room():
-return $default(_that.id,_that.roomNumber,_that.sharingType,_that.rentAmount,_that.status,_that.gender,_that.unitType,_that.isDisabledForRent,_that.isPublished,_that.availableFrom,_that.property,_that.beds,_that.images);case _:
+return $default(_that.id,_that.roomNumber,_that.floor,_that.sharingType,_that.rentAmount,_that.status,_that.gender,_that.unitType,_that.isDisabledForRent,_that.isPublished,_that.availableFrom,_that.property,_that.beds,_that.images,_that.amenities,_that.description,_that.remarks);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -490,10 +497,10 @@ return $default(_that.id,_that.roomNumber,_that.sharingType,_that.rentAmount,_th
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String roomNumber,  String sharingType,  int rentAmount,  String status,  String gender,  String unitType,  bool isDisabledForRent,  bool isPublished,  String? availableFrom,  PropertySummary? property,  List<Bed> beds,  List<String> images)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String roomNumber,  String floor,  String sharingType,  int rentAmount,  String status,  String gender,  String unitType,  bool isDisabledForRent,  bool isPublished,  String? availableFrom,  PropertySummary? property,  List<Bed> beds,  List<String> images,  List<String> amenities,  String? description,  String? remarks)?  $default,) {final _that = this;
 switch (_that) {
 case _Room() when $default != null:
-return $default(_that.id,_that.roomNumber,_that.sharingType,_that.rentAmount,_that.status,_that.gender,_that.unitType,_that.isDisabledForRent,_that.isPublished,_that.availableFrom,_that.property,_that.beds,_that.images);case _:
+return $default(_that.id,_that.roomNumber,_that.floor,_that.sharingType,_that.rentAmount,_that.status,_that.gender,_that.unitType,_that.isDisabledForRent,_that.isPublished,_that.availableFrom,_that.property,_that.beds,_that.images,_that.amenities,_that.description,_that.remarks);case _:
   return null;
 
 }
@@ -505,11 +512,12 @@ return $default(_that.id,_that.roomNumber,_that.sharingType,_that.rentAmount,_th
 @JsonSerializable()
 
 class _Room implements Room {
-  const _Room({required this.id, required this.roomNumber, required this.sharingType, required this.rentAmount, required this.status, this.gender = 'UNISEX', this.unitType = 'Room', this.isDisabledForRent = false, this.isPublished = true, this.availableFrom, this.property, this.beds = const [], this.images = const []});
+  const _Room({required this.id, required this.roomNumber, this.floor = '0', required this.sharingType, required this.rentAmount, required this.status, this.gender = 'UNISEX', this.unitType = 'Room', this.isDisabledForRent = false, this.isPublished = true, this.availableFrom, this.property, this.beds = const [], this.images = const [], this.amenities = const [], this.description, this.remarks});
   factory _Room.fromJson(Map<String, dynamic> json) => _$RoomFromJson(json);
 
 @override final  String id;
 @override final  String roomNumber;
+@override@JsonKey() final  String floor;
 @override final  String sharingType;
 @override final  int rentAmount;
 @override final  String status;
@@ -521,6 +529,9 @@ class _Room implements Room {
 @override final  PropertySummary? property;
 @override@JsonKey() final  List<Bed> beds;
 @override@JsonKey() final  List<String> images;
+@override@JsonKey() final  List<String> amenities;
+@override final  String? description;
+@override final  String? remarks;
 
 /// Create a copy of Room
 /// with the given fields replaced by the non-null parameter values.
@@ -535,16 +546,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Room&&(identical(other.id, id) || other.id == id)&&(identical(other.roomNumber, roomNumber) || other.roomNumber == roomNumber)&&(identical(other.sharingType, sharingType) || other.sharingType == sharingType)&&(identical(other.rentAmount, rentAmount) || other.rentAmount == rentAmount)&&(identical(other.status, status) || other.status == status)&&(identical(other.gender, gender) || other.gender == gender)&&(identical(other.unitType, unitType) || other.unitType == unitType)&&(identical(other.isDisabledForRent, isDisabledForRent) || other.isDisabledForRent == isDisabledForRent)&&(identical(other.isPublished, isPublished) || other.isPublished == isPublished)&&(identical(other.availableFrom, availableFrom) || other.availableFrom == availableFrom)&&(identical(other.property, property) || other.property == property)&&const DeepCollectionEquality().equals(other.beds, beds)&&const DeepCollectionEquality().equals(other.images, images));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Room&&(identical(other.id, id) || other.id == id)&&(identical(other.roomNumber, roomNumber) || other.roomNumber == roomNumber)&&(identical(other.floor, floor) || other.floor == floor)&&(identical(other.sharingType, sharingType) || other.sharingType == sharingType)&&(identical(other.rentAmount, rentAmount) || other.rentAmount == rentAmount)&&(identical(other.status, status) || other.status == status)&&(identical(other.gender, gender) || other.gender == gender)&&(identical(other.unitType, unitType) || other.unitType == unitType)&&(identical(other.isDisabledForRent, isDisabledForRent) || other.isDisabledForRent == isDisabledForRent)&&(identical(other.isPublished, isPublished) || other.isPublished == isPublished)&&(identical(other.availableFrom, availableFrom) || other.availableFrom == availableFrom)&&(identical(other.property, property) || other.property == property)&&const DeepCollectionEquality().equals(other.beds, beds)&&const DeepCollectionEquality().equals(other.images, images)&&const DeepCollectionEquality().equals(other.amenities, amenities)&&(identical(other.description, description) || other.description == description)&&(identical(other.remarks, remarks) || other.remarks == remarks));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,roomNumber,sharingType,rentAmount,status,gender,unitType,isDisabledForRent,isPublished,availableFrom,property,const DeepCollectionEquality().hash(beds),const DeepCollectionEquality().hash(images));
+int get hashCode => Object.hash(runtimeType,id,roomNumber,floor,sharingType,rentAmount,status,gender,unitType,isDisabledForRent,isPublished,availableFrom,property,const DeepCollectionEquality().hash(beds),const DeepCollectionEquality().hash(images),const DeepCollectionEquality().hash(amenities),description,remarks);
 
 @override
 String toString() {
-  return 'Room(id: $id, roomNumber: $roomNumber, sharingType: $sharingType, rentAmount: $rentAmount, status: $status, gender: $gender, unitType: $unitType, isDisabledForRent: $isDisabledForRent, isPublished: $isPublished, availableFrom: $availableFrom, property: $property, beds: $beds, images: $images)';
+  return 'Room(id: $id, roomNumber: $roomNumber, floor: $floor, sharingType: $sharingType, rentAmount: $rentAmount, status: $status, gender: $gender, unitType: $unitType, isDisabledForRent: $isDisabledForRent, isPublished: $isPublished, availableFrom: $availableFrom, property: $property, beds: $beds, images: $images, amenities: $amenities, description: $description, remarks: $remarks)';
 }
 
 
@@ -555,7 +566,7 @@ abstract mixin class _$RoomCopyWith<$Res> implements $RoomCopyWith<$Res> {
   factory _$RoomCopyWith(_Room value, $Res Function(_Room) _then) = __$RoomCopyWithImpl;
 @override @useResult
 $Res call({
- String id, String roomNumber, String sharingType, int rentAmount, String status, String gender, String unitType, bool isDisabledForRent, bool isPublished, String? availableFrom, PropertySummary? property, List<Bed> beds, List<String> images
+ String id, String roomNumber, String floor, String sharingType, int rentAmount, String status, String gender, String unitType, bool isDisabledForRent, bool isPublished, String? availableFrom, PropertySummary? property, List<Bed> beds, List<String> images, List<String> amenities, String? description, String? remarks
 });
 
 
@@ -572,10 +583,11 @@ class __$RoomCopyWithImpl<$Res>
 
 /// Create a copy of Room
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? roomNumber = null,Object? sharingType = null,Object? rentAmount = null,Object? status = null,Object? gender = null,Object? unitType = null,Object? isDisabledForRent = null,Object? isPublished = null,Object? availableFrom = freezed,Object? property = freezed,Object? beds = null,Object? images = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? roomNumber = null,Object? floor = null,Object? sharingType = null,Object? rentAmount = null,Object? status = null,Object? gender = null,Object? unitType = null,Object? isDisabledForRent = null,Object? isPublished = null,Object? availableFrom = freezed,Object? property = freezed,Object? beds = null,Object? images = null,Object? amenities = null,Object? description = freezed,Object? remarks = freezed,}) {
   return _then(_Room(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,roomNumber: null == roomNumber ? _self.roomNumber : roomNumber // ignore: cast_nullable_to_non_nullable
+as String,floor: null == floor ? _self.floor : floor // ignore: cast_nullable_to_non_nullable
 as String,sharingType: null == sharingType ? _self.sharingType : sharingType // ignore: cast_nullable_to_non_nullable
 as String,rentAmount: null == rentAmount ? _self.rentAmount : rentAmount // ignore: cast_nullable_to_non_nullable
 as int,status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
@@ -587,7 +599,10 @@ as bool,availableFrom: freezed == availableFrom ? _self.availableFrom : availabl
 as String?,property: freezed == property ? _self.property : property // ignore: cast_nullable_to_non_nullable
 as PropertySummary?,beds: null == beds ? _self.beds : beds // ignore: cast_nullable_to_non_nullable
 as List<Bed>,images: null == images ? _self.images : images // ignore: cast_nullable_to_non_nullable
-as List<String>,
+as List<String>,amenities: null == amenities ? _self.amenities : amenities // ignore: cast_nullable_to_non_nullable
+as List<String>,description: freezed == description ? _self.description : description // ignore: cast_nullable_to_non_nullable
+as String?,remarks: freezed == remarks ? _self.remarks : remarks // ignore: cast_nullable_to_non_nullable
+as String?,
   ));
 }
 
@@ -882,7 +897,7 @@ as String?,
 /// @nodoc
 mixin _$Bed {
 
- String get id; String get bedNumber; String get status;
+ String get id; String get bedNumber; String get status; List<Resident> get residents;
 /// Create a copy of Bed
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -895,16 +910,16 @@ $BedCopyWith<Bed> get copyWith => _$BedCopyWithImpl<Bed>(this as Bed, _$identity
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is Bed&&(identical(other.id, id) || other.id == id)&&(identical(other.bedNumber, bedNumber) || other.bedNumber == bedNumber)&&(identical(other.status, status) || other.status == status));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is Bed&&(identical(other.id, id) || other.id == id)&&(identical(other.bedNumber, bedNumber) || other.bedNumber == bedNumber)&&(identical(other.status, status) || other.status == status)&&const DeepCollectionEquality().equals(other.residents, residents));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,bedNumber,status);
+int get hashCode => Object.hash(runtimeType,id,bedNumber,status,const DeepCollectionEquality().hash(residents));
 
 @override
 String toString() {
-  return 'Bed(id: $id, bedNumber: $bedNumber, status: $status)';
+  return 'Bed(id: $id, bedNumber: $bedNumber, status: $status, residents: $residents)';
 }
 
 
@@ -915,7 +930,7 @@ abstract mixin class $BedCopyWith<$Res>  {
   factory $BedCopyWith(Bed value, $Res Function(Bed) _then) = _$BedCopyWithImpl;
 @useResult
 $Res call({
- String id, String bedNumber, String status
+ String id, String bedNumber, String status, List<Resident> residents
 });
 
 
@@ -932,12 +947,13 @@ class _$BedCopyWithImpl<$Res>
 
 /// Create a copy of Bed
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? bedNumber = null,Object? status = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? bedNumber = null,Object? status = null,Object? residents = null,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,bedNumber: null == bedNumber ? _self.bedNumber : bedNumber // ignore: cast_nullable_to_non_nullable
 as String,status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
-as String,
+as String,residents: null == residents ? _self.residents : residents // ignore: cast_nullable_to_non_nullable
+as List<Resident>,
   ));
 }
 
@@ -1022,10 +1038,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String bedNumber,  String status)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String bedNumber,  String status,  List<Resident> residents)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _Bed() when $default != null:
-return $default(_that.id,_that.bedNumber,_that.status);case _:
+return $default(_that.id,_that.bedNumber,_that.status,_that.residents);case _:
   return orElse();
 
 }
@@ -1043,10 +1059,10 @@ return $default(_that.id,_that.bedNumber,_that.status);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String bedNumber,  String status)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String bedNumber,  String status,  List<Resident> residents)  $default,) {final _that = this;
 switch (_that) {
 case _Bed():
-return $default(_that.id,_that.bedNumber,_that.status);case _:
+return $default(_that.id,_that.bedNumber,_that.status,_that.residents);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -1063,10 +1079,10 @@ return $default(_that.id,_that.bedNumber,_that.status);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String bedNumber,  String status)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String bedNumber,  String status,  List<Resident> residents)?  $default,) {final _that = this;
 switch (_that) {
 case _Bed() when $default != null:
-return $default(_that.id,_that.bedNumber,_that.status);case _:
+return $default(_that.id,_that.bedNumber,_that.status,_that.residents);case _:
   return null;
 
 }
@@ -1078,12 +1094,13 @@ return $default(_that.id,_that.bedNumber,_that.status);case _:
 @JsonSerializable()
 
 class _Bed implements Bed {
-  const _Bed({required this.id, required this.bedNumber, required this.status});
+  const _Bed({required this.id, required this.bedNumber, required this.status, this.residents = const []});
   factory _Bed.fromJson(Map<String, dynamic> json) => _$BedFromJson(json);
 
 @override final  String id;
 @override final  String bedNumber;
 @override final  String status;
+@override@JsonKey() final  List<Resident> residents;
 
 /// Create a copy of Bed
 /// with the given fields replaced by the non-null parameter values.
@@ -1098,16 +1115,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Bed&&(identical(other.id, id) || other.id == id)&&(identical(other.bedNumber, bedNumber) || other.bedNumber == bedNumber)&&(identical(other.status, status) || other.status == status));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Bed&&(identical(other.id, id) || other.id == id)&&(identical(other.bedNumber, bedNumber) || other.bedNumber == bedNumber)&&(identical(other.status, status) || other.status == status)&&const DeepCollectionEquality().equals(other.residents, residents));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,bedNumber,status);
+int get hashCode => Object.hash(runtimeType,id,bedNumber,status,const DeepCollectionEquality().hash(residents));
 
 @override
 String toString() {
-  return 'Bed(id: $id, bedNumber: $bedNumber, status: $status)';
+  return 'Bed(id: $id, bedNumber: $bedNumber, status: $status, residents: $residents)';
 }
 
 
@@ -1118,7 +1135,7 @@ abstract mixin class _$BedCopyWith<$Res> implements $BedCopyWith<$Res> {
   factory _$BedCopyWith(_Bed value, $Res Function(_Bed) _then) = __$BedCopyWithImpl;
 @override @useResult
 $Res call({
- String id, String bedNumber, String status
+ String id, String bedNumber, String status, List<Resident> residents
 });
 
 
@@ -1135,12 +1152,13 @@ class __$BedCopyWithImpl<$Res>
 
 /// Create a copy of Bed
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? bedNumber = null,Object? status = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? bedNumber = null,Object? status = null,Object? residents = null,}) {
   return _then(_Bed(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,bedNumber: null == bedNumber ? _self.bedNumber : bedNumber // ignore: cast_nullable_to_non_nullable
 as String,status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
-as String,
+as String,residents: null == residents ? _self.residents : residents // ignore: cast_nullable_to_non_nullable
+as List<Resident>,
   ));
 }
 

@@ -1,57 +1,137 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../app/di/providers.dart';
+import '../../../core/design_system/theme.dart';
 import '../../../shared/components/common.dart';
 import '../../../shared/models/models.dart';
 
+const _green = PgTheme.positive,
+    _red = PgTheme.negative,
+    _ink = PgTheme.analyticsInk;
+Map<String, dynamic> _part(Map<String, dynamic> data, String key) =>
+    Map<String, dynamic>.from(data[key] as Map? ?? {});
+int _n(Map<String, dynamic> data, String key) =>
+    (data[key] as num?)?.round() ?? 0;
+String _r(Map<String, dynamic> data, String key) => rupees(_n(data, key));
+
 class AnalyticsScreen extends ConsumerStatefulWidget {
   const AnalyticsScreen({super.key});
-
   @override
   ConsumerState<AnalyticsScreen> createState() => _AnalyticsScreenState();
 }
 
 class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
-  late DateTime period;
+  DateTime period = DateTime(DateTime.now().year, DateTime.now().month);
+  bool fy = false, combined = false, showPeriods = false, nowSelected = false;
+  String search = '', financeView = 'Dues', breakup = 'Category';
+  int propertyPages = 1;
+  Timer? searchTimer;
 
   @override
-  void initState() {
-    super.initState();
-    final now = DateTime.now();
-    period = DateTime(now.year, now.month);
+  void dispose() {
+    searchTimer?.cancel();
+    super.dispose();
+  }
+
+  String get periodLabel {
+    if (fy) return 'Current FY';
+    final now = DateTime.now(),
+        last = DateTime(DateTime.now().year, DateTime.now().month - 1);
+    if (period.year == now.year && period.month == now.month) {
+      return 'This Month';
+    }
+    if (period.year == last.year && period.month == last.month) {
+      return 'Last Month';
+    }
+    return DateFormat.yMMM().format(period);
   }
 
   Future<void> choosePeriod() async {
-    final selected = await showDatePicker(
+    final picked = await showDatePicker(
       context: context,
       initialDate: period,
       firstDate: DateTime(2000),
       lastDate: DateTime(DateTime.now().year + 1, 12, 31),
-      helpText: 'Select any day in the reporting month',
     );
-    if (selected != null && mounted) {
-      setState(() => period = DateTime(selected.year, selected.month));
+    if (picked != null) {
+      setState(() {
+        period = DateTime(picked.year, picked.month);
+        fy = false;
+        nowSelected = false;
+      });
     }
+  }
+
+  void setPeriod(String label) {
+    if (label == 'Custom') {
+      choosePeriod();
+      return;
+    }
+    final now = DateTime.now();
+    setState(() {
+      period = label == 'Last Month'
+          ? DateTime(now.year, now.month - 1)
+          : DateTime(now.year, now.month);
+      fy = label == 'Current FY';
+      nowSelected = label == 'Now';
+      showPeriods = false;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    final selected = ref.watch(selectedPropertyProvider);
+    final name = selected == null
+        ? 'All properties'
+        : ref.watch(dashboardPropertyNameProvider(selected)).asData?.value ??
+              'Property';
     final query = (
-      propertyId: ref.watch(selectedPropertyProvider),
+      propertyId: selected,
       month: period.month,
       year: period.year,
+      fy: fy,
     );
+    final value = ref.watch(dashboardPeriodProvider(query));
     return DefaultTabController(
       length: 5,
       child: Scaffold(
+        backgroundColor: PgTheme.analyticsCanvas,
         appBar: AppBar(
-          title: const Text('Analytics dashboard'),
+          title: InkWell(
+            onTap: () => context.push('/properties/select'),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(child: Text(name, overflow: TextOverflow.ellipsis)),
+                const Icon(Icons.keyboard_arrow_down),
+              ],
+            ),
+          ),
+          actions: const [
+            Padding(
+              padding: EdgeInsets.only(right: 16),
+              child: Center(
+                child: Text(
+                  'ⓘ BETA',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+          ],
           bottom: const TabBar(
             isScrollable: true,
+            tabAlignment: TabAlignment.start,
+            indicatorColor: Colors.white,
+            indicatorWeight: 3,
+            labelColor: Colors.white,
+            unselectedLabelColor: Color(0xffb9c5fa),
             tabs: [
-              Tab(text: 'Birds eye'),
+              Tab(text: "Bird's Eye View"),
               Tab(text: 'Financials'),
               Tab(text: 'Occupancy'),
               Tab(text: 'Tenants'),
@@ -59,130 +139,872 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
             ],
           ),
         ),
-        body: Column(
+        body: TabBarView(
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Reporting period',
-                      style: Theme.of(context).textTheme.titleSmall,
-                    ),
+            _birds(selected),
+            _async(value, _financial),
+            _async(value, _occupancy),
+            _async(value, _tenants),
+            _async(value, _issues),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _async(
+    AsyncValue<Map<String, dynamic>> value,
+    Widget Function(Map<String, dynamic>) builder,
+  ) {
+    final data = value.asData?.value;
+    if (data != null) return builder(data);
+    if (value.hasError) {
+      return PgAsync(
+        value: value,
+        data: builder,
+        retry: () => ref.invalidate(
+          dashboardPeriodProvider((
+            propertyId: ref.read(selectedPropertyProvider),
+            month: period.month,
+            year: period.year,
+            fy: fy,
+          )),
+        ),
+      );
+    }
+    return const _DashboardSkeleton();
+  }
+
+  Widget _birds(String? selected) {
+    final matches = <Property>[];
+    var hasMore = false;
+    var loading = false;
+    Object? error;
+    for (var page = 1; page <= propertyPages; page++) {
+      final value = ref.watch(
+        dashboardPropertiesProvider((search: search, page: page)),
+      );
+      final result = value.asData?.value;
+      if (result == null) {
+        loading = value.isLoading;
+        error = value.error;
+        break;
+      }
+      matches.addAll(result.items);
+      hasMore = result.hasMore;
+    }
+    return Column(
+      children: [
+        Container(
+          color: Colors.white,
+          padding: const EdgeInsets.all(16),
+          child: SearchField(
+            hint: 'Search properties',
+            onChanged: (v) {
+              searchTimer?.cancel();
+              searchTimer = Timer(const Duration(milliseconds: 300), () {
+                if (mounted) {
+                  setState(() {
+                    search = v.trim();
+                    propertyPages = 1;
+                  });
+                }
+              });
+            },
+          ),
+        ),
+        Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount:
+                1 +
+                (combined ? 1 : 0) +
+                (matches.isEmpty && !combined ? 1 : 0) +
+                matches.length +
+                ((matches.isNotEmpty || combined) &&
+                        (hasMore || loading || error != null)
+                    ? 1
+                    : 0),
+            itemBuilder: (context, index) {
+              if (index == 0) {
+                return _panel(
+                  Row(
+                    children: [
+                      const Icon(Icons.show_chart, color: PgTheme.blue),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          'Show combined summary',
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      Switch(
+                        value: combined,
+                        onChanged: (v) => setState(() => combined = v),
+                      ),
+                    ],
                   ),
-                  OutlinedButton.icon(
-                    onPressed: choosePeriod,
-                    icon: const Icon(Icons.calendar_month_outlined),
-                    label: Text(DateFormat.yMMMM().format(period)),
+                );
+              }
+              if (combined && index == 1) {
+                return _property('Combined summary', null, true);
+              }
+              if (matches.isEmpty && index == 1) {
+                if (loading) return _panel(const _SkeletonLines());
+                if (error != null) {
+                  return _panel(
+                    TextButton(
+                      onPressed: () => ref.invalidate(
+                        dashboardPropertiesProvider((
+                          search: search,
+                          page: propertyPages,
+                        )),
+                      ),
+                      child: const Text('Retry loading properties'),
+                    ),
+                  );
+                }
+                return _panel(const Text('No properties match your search.'));
+              }
+              final propertyIndex = index - 1 - (combined ? 1 : 0);
+              if (propertyIndex >= matches.length) {
+                if (loading) return _panel(const _SkeletonLines());
+                if (error != null) {
+                  return _panel(
+                    TextButton(
+                      onPressed: () => ref.invalidate(
+                        dashboardPropertiesProvider((
+                          search: search,
+                          page: propertyPages,
+                        )),
+                      ),
+                      child: const Text('Retry loading properties'),
+                    ),
+                  );
+                }
+                return Center(
+                  child: TextButton(
+                    onPressed: () => setState(() => propertyPages++),
+                    child: const Text('Load more properties'),
+                  ),
+                );
+              }
+              final p = matches[propertyIndex];
+              return _property(p.name, p.id, p.id == selected);
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _property(String name, String? id, bool current) => Consumer(
+    builder: (context, ref, _) {
+      final value = ref.watch(
+        dashboardPeriodProvider((
+          propertyId: id,
+          month: period.month,
+          year: period.year,
+          fy: fy,
+        )),
+      );
+      final data = value.asData?.value;
+      if (data == null) return _panel(const _SkeletonLines());
+      final op = _part(data, 'operational'), f = _part(data, 'financial');
+      final beds = _n(op, 'totalBeds'),
+          occupied = _n(op, 'occupiedBeds'),
+          window = fy ? 'Current FY' : DateFormat.MMMM().format(period);
+      return _panel(
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    name,
+                    style: Theme.of(context).textTheme.titleLarge
+                        ?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                if (current) const Chip(label: Text('Current')),
+              ],
+            ),
+            if (id != null)
+              Text(
+                'Property ID: $id',
+                style: const TextStyle(color: Colors.grey, fontSize: 12),
+              ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xfff7f7f9),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      const Expanded(child: Text('Occupied Beds')),
+                      Text(
+                        '$occupied/$beds',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  LinearProgressIndicator(
+                    value: beds == 0 ? 0 : occupied / beds,
+                    color: _green,
+                    backgroundColor: const Color(0xffd1d2d7),
+                    minHeight: 8,
+                    borderRadius: BorderRadius.circular(8),
                   ),
                 ],
               ),
             ),
-            Expanded(
-              child: PgAsync(
-                value: ref.watch(dashboardPeriodProvider(query)),
-                retry: () => ref.invalidate(dashboardPeriodProvider(query)),
-                data: (data) {
-                  final op = data['operational'] as Map<String, dynamic>,
-                      fin = data['financial'] as Map<String, dynamic>;
-                  Widget metrics(List<(String, String)> entries) =>
-                      GridView.builder(
-                        padding: const EdgeInsets.all(16),
-                        gridDelegate:
-                            const SliverGridDelegateWithMaxCrossAxisExtent(
-                              maxCrossAxisExtent: 230,
-                              childAspectRatio: 1.5,
-                            ),
-                        itemCount: entries.length,
-                        itemBuilder: (context, index) => MetricCard(
-                          label: entries[index].$1,
-                          value: entries[index].$2,
-                        ),
-                      );
-                  return TabBarView(
+            const SizedBox(height: 16),
+            _line("Today's Collection", _r(f, 'todayCollectedPaise'), _green),
+            _line('$window Collections', _r(f, 'monthCollectedPaise'), _green),
+            _line('$window Dues', _r(f, 'monthOutstandingPaise'), _red),
+            _line('Total Dues', _r(f, 'outstandingBalancePaise'), _red),
+            _line('$window Expenses', _r(f, 'monthExpensesPaise'), _red),
+            _line(
+              'Rent Defaulters',
+              '${_n(op, 'rentDefaulters')}',
+              Colors.purple,
+            ),
+            _line(
+              'Available Deposits',
+              _r(f, 'securityDepositsHeldPaise'),
+              _green,
+            ),
+            _line(
+              'Pending Deposits',
+              _r(f, 'pendingDepositsPaise'),
+              Colors.orange,
+            ),
+            _line('$window Profit', _r(f, 'monthProfitPaise'), _green),
+            _line('Potential Rent', _r(f, 'potentialRentPaise'), PgTheme.blue),
+            _line('Active Tenants', '${_n(op, 'activeTenants')}', PgTheme.blue),
+            _line(
+              'Notice Period Tenants',
+              '${_n(op, 'noticePeriodTenants')}',
+              _red,
+            ),
+            _line(
+              'Current Bookings',
+              '${_n(op, 'currentBookings')}',
+              PgTheme.blue,
+            ),
+            _line('Total Rooms', '${_n(op, 'totalRooms')}', PgTheme.blue),
+            _line('Active Leads', '${_n(op, 'activeLeads')}', PgTheme.blue),
+            _line('Active Complaints', '${_n(op, 'pendingComplaints')}', _red),
+          ],
+        ),
+      );
+    },
+  );
+  Widget _financial(Map<String, dynamic> data) {
+    final f = _part(data, 'financial');
+    return _scroll([
+      _chips(
+        ['$periodLabel ⌄', 'Dues', 'Collections'],
+        [
+          () => setState(() => showPeriods = !showPeriods),
+          () => setState(() => financeView = 'Dues'),
+          () => setState(() => financeView = 'Collections'),
+        ],
+        financeView,
+      ),
+      if (showPeriods) _periodFilters(false),
+      if (financeView == 'Dues') ...[
+        _snapshot(
+          'Dues Overview',
+          [
+            (_r(f, 'outstandingBalancePaise'), 'All-time dues'),
+            (_r(f, 'pastDuesPaise'), 'All past dues'),
+            (_r(f, 'monthOutstandingPaise'), 'Period dues'),
+          ],
+          [
+            ('All-time dues', _r(f, 'outstandingBalancePaise')),
+            ('Past dues', _r(f, 'pastDuesPaise')),
+            ('Period dues', _r(f, 'monthOutstandingPaise')),
+            ('Overdue', _r(f, 'overdueDuesPaise')),
+          ],
+        ),
+        _chart('Live Dues', [
+          ('Total dues', _n(f, 'outstandingBalancePaise'), PgTheme.blue),
+          ('Overdue', _n(f, 'overdueDuesPaise'), _red),
+          ('Due today', _n(f, 'todayDuesPaise'), Colors.orange),
+          ('Due this week', _n(f, 'weekDuesPaise'), _green),
+          ('Due later', _n(f, 'futureDuesPaise'), Colors.purple),
+        ], money: true),
+        _panel(
+          Column(
+            children: [
+              const _Title('Bills Summary'),
+              _line('Bills due', _r(f, 'monthOutstandingPaise'), _red),
+              _line('Bills received', _r(f, 'monthCollectedPaise'), _green),
+            ],
+          ),
+        ),
+      ] else ...[
+        _snapshot(
+          'Collection Overview',
+          [
+            (_r(f, 'totalCollectedPaise'), 'Total Collection'),
+            (_r(f, 'monthCollectedPaise'), 'Period collections'),
+          ],
+          [
+            ('Total collections', _r(f, 'totalCollectedPaise')),
+            ('Period collections', _r(f, 'monthCollectedPaise')),
+            ("Today's collections", _r(f, 'todayCollectedPaise')),
+          ],
+        ),
+        _panel(
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const _Title('Collection Breakup'),
+              _chips(
+                ['Category', 'Status', 'Mode', 'Received By'],
+                [
+                  for (final item in [
+                    'Category',
+                    'Status',
+                    'Mode',
+                    'Received By',
+                  ])
+                    () => setState(() => breakup = item),
+                ],
+                breakup,
+              ),
+              const SizedBox(height: 12),
+              Text('Total Collection ${_r(f, 'monthCollectedPaise')}'),
+              ..._breakdown(f),
+            ],
+          ),
+        ),
+        _chart('Collection Status', [
+          ('Period dues', _n(f, 'monthOutstandingPaise'), PgTheme.blue),
+          ('Past dues', _n(f, 'pastDuesPaise'), const Color(0xffdbe8f7)),
+        ], money: true),
+      ],
+    ]);
+  }
+
+  Widget _occupancy(Map<String, dynamic> data) {
+    final op = _part(data, 'operational'), f = _part(data, 'financial');
+    final total = _n(op, 'totalBeds'), occupied = _n(op, 'occupiedBeds');
+    return _scroll([
+      _periodFilters(true),
+      _snapshot(
+        'Overview Snapshot',
+        [
+          ('$total', 'Rentable Beds'),
+          ('$occupied', 'Occupied Beds'),
+          ('${_n(op, 'availableBeds')}', 'Vacant Beds'),
+        ],
+        [
+          ('Rentable beds', '$total'),
+          ('Occupied beds', '$occupied'),
+          ('Vacant beds', '${_n(op, 'availableBeds')}'),
+          ('Occupancy rate', '${_n(op, 'occupancyRate')}%'),
+        ],
+      ),
+      _panel(
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const _Title('Occupancy Status'),
+            Text(
+              'Total Beds: $total · $total rentable',
+              style: const TextStyle(color: Colors.grey),
+            ),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                SizedBox(
+                  width: 140,
+                  height: 140,
+                  child: Stack(
+                    alignment: Alignment.center,
                     children: [
-                      metrics([
-                        ('Occupied beds', '${op['occupiedBeds']}'),
-                        (
-                          'Total collection',
-                          rupees(fin['totalCollectedPaise'] as num),
+                      const SizedBox.expand(
+                        child: CircularProgressIndicator(
+                          value: 1,
+                          strokeWidth: 14,
+                          color: _red,
                         ),
-                        (
-                          'Selected month',
-                          rupees(fin['monthCollectedPaise'] as num),
+                      ),
+                      SizedBox.expand(
+                        child: CircularProgressIndicator(
+                          value: total == 0 ? 0 : occupied / total,
+                          strokeWidth: 14,
+                          color: _green,
                         ),
-                        (
-                          'Total dues',
-                          rupees(fin['outstandingBalancePaise'] as num),
-                        ),
-                        (
-                          'Selected month dues',
-                          rupees(fin['monthOutstandingPaise'] as num),
-                        ),
-                        ('Expenses', rupees(fin['totalExpensesPaise'] as num)),
-                        (
-                          'Deposits held',
-                          rupees(fin['securityDepositsHeldPaise'] as num),
-                        ),
-                        (
-                          'Pending deposits',
-                          rupees(fin['pendingDepositsPaise'] as num),
-                        ),
-                        ('Total rooms', '${op['totalRooms']}'),
-                        ('Complaints', '${op['pendingComplaints']}'),
-                      ]),
-                      metrics([
-                        (
-                          'Today collected',
-                          rupees(fin['todayCollectedPaise'] as num),
-                        ),
-                        (
-                          'Period collected',
-                          rupees(fin['monthCollectedPaise'] as num),
-                        ),
-                        (
-                          'Period billed',
-                          rupees(fin['monthBilledPaise'] as num),
-                        ),
-                        (
-                          'Outstanding',
-                          rupees(fin['outstandingBalancePaise'] as num),
-                        ),
-                        (
-                          'Net cashflow',
-                          rupees(fin['netCashflowPaise'] as num),
-                        ),
-                        (
-                          'Period expenses',
-                          rupees(fin['monthExpensesPaise'] as num),
-                        ),
-                      ]),
-                      metrics([
-                        ('Rentable beds', '${op['totalBeds']}'),
-                        ('Occupied beds', '${op['occupiedBeds']}'),
-                        ('Available beds', '${op['availableBeds']}'),
-                        ('Occupancy rate', '${op['occupancyRate']}%'),
-                      ]),
-                      metrics([
-                        ('Current tenants', '${op['currentResidents']}'),
-                        ('Upcoming move-ins', '${op['upcomingMoveIns']}'),
-                        ('Period move-ins', '${op['periodMoveIns']}'),
-                        ('Period move-outs', '${op['periodMoveOuts']}'),
-                      ]),
-                      metrics([
-                        ('Pending complaints', '${op['pendingComplaints']}'),
-                        ('Issues created', '${op['periodComplaintsCreated']}'),
-                        (
-                          'Issues resolved',
-                          '${op['periodComplaintsResolved']}',
-                        ),
-                      ]),
+                      ),
+                      Text(
+                        '${_n(op, 'occupancyRate')}%',
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(fontWeight: FontWeight.bold),
+                      ),
                     ],
-                  );
-                },
+                  ),
+                ),
+                const SizedBox(width: 20),
+                Expanded(
+                  child: Column(
+                    children: [
+                      _line('Occupied', '$occupied', _green),
+                      _line('Vacant', '${total - occupied}', _red),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+      _panel(
+        Column(
+          children: [
+            const _Title('Revenue per bed'),
+            _line(
+              'Average rent per bed',
+              total == 0 ? '₹0' : rupees(_n(f, 'potentialRentPaise') / total),
+              PgTheme.blue,
+            ),
+            _line(
+              'Average revenue per bed',
+              total == 0 ? '₹0' : rupees(_n(f, 'monthCollectedPaise') / total),
+              _green,
+            ),
+          ],
+        ),
+      ),
+    ]);
+  }
+
+  Widget _tenants(Map<String, dynamic> data) {
+    final op = _part(data, 'operational');
+    return _scroll([
+      _periodFilters(false),
+      _snapshot(
+        'Overview Snapshot',
+        [
+          ('${_n(op, 'activeTenants')}', 'Active Tenants'),
+          ('${_n(op, 'currentBookings')}', 'Active Bookings'),
+          ('${_n(op, 'approvedBookings')}', 'Approved Bookings'),
+          ('${_n(op, 'noticePeriodTenants')}', 'Notice Raised'),
+        ],
+        [
+          ('Active tenants', '${_n(op, 'activeTenants')}'),
+          ('Active bookings', '${_n(op, 'currentBookings')}'),
+          ('Approved bookings', '${_n(op, 'approvedBookings')}'),
+          ('Notice raised', '${_n(op, 'noticePeriodTenants')}'),
+        ],
+      ),
+      _chart('Tenant Journey', [
+        ('Move-ins', _n(op, 'periodMoveIns'), _green),
+        ('Move-outs', _n(op, 'periodMoveOuts'), _red),
+        ('Upcoming move-ins', _n(op, 'upcomingMoveIns'), PgTheme.blue),
+      ]),
+      _panel(
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const _Title('Tenant Verification'),
+            _line(
+              'ID proof uploaded',
+              '${_n(op, 'residentsWithIdProof')}',
+              _green,
+            ),
+            _line(
+              'ID proof pending',
+              '${(_n(op, 'activeTenants') - _n(op, 'residentsWithIdProof')).clamp(0, 999999999)}',
+              _red,
+            ),
+            const Text(
+              'Document upload is not a completed identity check.',
+              style: TextStyle(color: Colors.grey, fontSize: 12),
+            ),
+          ],
+        ),
+      ),
+    ]);
+  }
+
+  Widget _issues(Map<String, dynamic> data) {
+    final op = _part(data, 'operational');
+    return _scroll([
+      _periodFilters(false),
+      _snapshot(
+        'Overview Snapshot',
+        [
+          ('${_n(op, 'periodComplaintsCreated')}', 'Issues Created'),
+          ('${_n(op, 'periodComplaintsResolved')}', 'Issues Resolved'),
+        ],
+        [
+          ('Issues created', '${_n(op, 'periodComplaintsCreated')}'),
+          ('Issues resolved', '${_n(op, 'periodComplaintsResolved')}'),
+          ('Currently open', '${_n(op, 'pendingComplaints')}'),
+        ],
+      ),
+      _chart('Current Status', [
+        ('Open', _n(op, 'pendingComplaints'), _red),
+        ('Resolved', _n(op, 'periodComplaintsResolved'), _green),
+      ]),
+      _chart('Ageing Distribution', [
+        (
+          'Under 7 days',
+          _n(_part(op, 'complaintAgeing'), 'under7Days'),
+          _green,
+        ),
+        (
+          '7–30 days',
+          _n(_part(op, 'complaintAgeing'), 'days7To30'),
+          Colors.orange,
+        ),
+        ('Over 30 days', _n(_part(op, 'complaintAgeing'), 'over30Days'), _red),
+      ]),
+    ]);
+  }
+
+  Widget _periodFilters(bool now) => _chips(
+    [if (now) 'Now', 'This Month', 'Last Month', 'Current FY', 'Custom'],
+    [
+      if (now) () => setPeriod('Now'),
+      () => setPeriod('This Month'),
+      () => setPeriod('Last Month'),
+      () => setPeriod('Current FY'),
+      choosePeriod,
+    ],
+    now && nowSelected ? 'Now' : periodLabel,
+  );
+  Widget _scroll(List<Widget> children) =>
+      ListView(padding: const EdgeInsets.all(16), children: children);
+  Widget _panel(Widget child) => Container(
+    margin: const EdgeInsets.only(bottom: 16),
+    padding: const EdgeInsets.all(20),
+    decoration: BoxDecoration(
+      color: Theme.of(context).colorScheme.surface,
+      borderRadius: BorderRadius.circular(20),
+    ),
+    child: child,
+  );
+  Widget _chips(
+    List<String> labels,
+    List<VoidCallback> actions,
+    String selected,
+  ) => SizedBox(
+    height: 56,
+    child: ListView.separated(
+      scrollDirection: Axis.horizontal,
+      itemCount: labels.length,
+      separatorBuilder: (_, _) => const SizedBox(width: 8),
+      itemBuilder: (context, i) {
+        final active = labels[i] == selected;
+        return ActionChip(
+          label: Text(labels[i]),
+          onPressed: actions[i],
+          backgroundColor: active ? _ink : Colors.white,
+          labelStyle: TextStyle(color: active ? Colors.white : _ink),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(9),
+            side: BorderSide(color: active ? _ink : const Color(0xffe6e6e9)),
+          ),
+        );
+      },
+    ),
+  );
+  Widget _snapshot(
+    String title,
+    List<(String, String)> cards,
+    List<(String, String)> detail,
+  ) => _panel(
+    Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(child: _Title(title)),
+            TextButton(
+              onPressed: () => _showDetail(title, detail),
+              child: const Text('View all ›'),
+            ),
+          ],
+        ),
+        SizedBox(
+          height: 140,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: cards.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 12),
+            itemBuilder: (context, i) => Container(
+              width: 145,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                border: Border.all(color: const Color(0xffe8e8eb)),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    cards[i].$1,
+                    style: Theme.of(context).textTheme.headlineSmall
+                        ?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  Text(cards[i].$2, style: const TextStyle(color: Colors.grey)),
+                ],
               ),
             ),
+          ),
+        ),
+      ],
+    ),
+  );
+  void _showDetail(String title, List<(String, String)> rows) =>
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        showDragHandle: true,
+        builder: (sheet) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(sheet),
+                      icon: const Icon(Icons.close),
+                    ),
+                  ],
+                ),
+                for (final row in rows) _line(row.$1, row.$2, PgTheme.blue),
+              ],
+            ),
+          ),
+        ),
+      );
+  Widget _chart(
+    String title,
+    List<(String, int, Color)> rows, {
+    bool money = false,
+  }) {
+    final max = rows.fold<int>(1, (a, b) => b.$2 > a ? b.$2 : a);
+    return _panel(
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _Title(title),
+          for (final row in rows)
+            _bar(row.$1, row.$2, max, row.$3, money: money),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _breakdown(Map<String, dynamic> financial) {
+    final raw = financial['collectionBreakdown'] as List? ?? [];
+    final rows = raw
+        .map((item) => Map<String, dynamic>.from(item as Map))
+        .where((item) => item['dimension'] == breakup)
+        .toList();
+    if (rows.isEmpty) {
+      return [
+        const Padding(
+          padding: EdgeInsets.only(top: 24),
+          child: Text('No collections in this period.'),
+        ),
+      ];
+    }
+    final max = rows.fold<int>(
+      1,
+      (current, item) =>
+          _n(item, 'amountPaise') > current ? _n(item, 'amountPaise') : current,
+    );
+    return [
+      for (final row in rows)
+        _bar(
+          (row['label'] as String).replaceAll('_', ' '),
+          _n(row, 'amountPaise'),
+          max,
+          _green,
+          money: true,
+        ),
+    ];
+  }
+
+  Widget _bar(
+    String label,
+    int value,
+    int max,
+    Color color, {
+    bool money = false,
+  }) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 9),
+    child: Row(
+      children: [
+        SizedBox(width: 116, child: Text(label)),
+        Expanded(
+          child: Container(
+            height: 30,
+            alignment: Alignment.centerLeft,
+            decoration: BoxDecoration(
+              color: const Color(0xfff2f4f7),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: FractionallySizedBox(
+              widthFactor: value <= 0 ? 0 : (value / max).clamp(0.02, 1),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: color,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(money ? rupees(value) : '$value'),
+      ],
+    ),
+  );
+  Widget _line(String label, String value, Color color) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 10),
+    child: Row(
+      children: [
+        CircleAvatar(
+          radius: 13,
+          backgroundColor: color,
+          child: const Icon(Icons.trending_up, size: 16, color: Colors.white),
+        ),
+        const SizedBox(width: 12),
+        Expanded(child: Text(label)),
+        Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
+      ],
+    ),
+  );
+}
+
+class _Title extends StatelessWidget {
+  const _Title(this.text);
+  final String text;
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 12),
+    child: Text(
+      text,
+      style: Theme.of(context).textTheme.titleLarge
+          ?.copyWith(fontWeight: FontWeight.bold),
+    ),
+  );
+}
+
+class _SkeletonLines extends StatelessWidget {
+  const _SkeletonLines();
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      for (final width in [120.0, 240.0, 190.0, 260.0])
+        Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: Container(
+            width: width,
+            height: 22,
+            decoration: BoxDecoration(
+              color: const Color(0xffe7e9ef),
+              borderRadius: BorderRadius.circular(7),
+            ),
+          ),
+        ),
+    ],
+  );
+}
+
+class _DashboardSkeleton extends StatefulWidget {
+  const _DashboardSkeleton();
+  @override
+  State<_DashboardSkeleton> createState() => _DashboardSkeletonState();
+}
+
+class _DashboardSkeletonState extends State<_DashboardSkeleton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1400),
+  )..repeat();
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      controller.stop();
+    } else if (!controller.isAnimating) {
+      controller.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    return Semantics(
+      label: 'Loading analytics',
+      child: ExcludeSemantics(
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            for (final height in [56.0, 180.0, 230.0])
+              AnimatedBuilder(
+                animation: controller,
+                builder: (context, child) => Container(
+                  height: height,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: ShaderMask(
+                    blendMode: BlendMode.srcATop,
+                    shaderCallback: (bounds) => LinearGradient(
+                      begin: Alignment(
+                        -1.5 + (reduceMotion ? 0 : controller.value * 3),
+                        0,
+                      ),
+                      end: Alignment(
+                        -0.5 + (reduceMotion ? 0 : controller.value * 3),
+                        0,
+                      ),
+                      colors: const [
+                        Color(0xffe7e9ef),
+                        Color(0xfff8f9fc),
+                        Color(0xffe7e9ef),
+                      ],
+                    ).createShader(bounds),
+                    child: const _SkeletonLines(),
+                  ),
+                ),
+              ),
           ],
         ),
       ),

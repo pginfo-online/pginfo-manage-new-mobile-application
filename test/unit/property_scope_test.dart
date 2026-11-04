@@ -8,7 +8,13 @@ import 'package:mobile/shared/models/models.dart';
 class FakeRepository extends PgRepository {
   FakeRepository() : super(ApiClient(const FlutterSecureStorage()));
   @override
-  Future<List<Room>> rooms(String propertyId, {int page = 1}) async => [
+  Future<List<Room>> rooms(
+    String propertyId, {
+    int page = 1,
+    int limit = 20,
+    String search = '',
+    String? floor,
+  }) async => [
     Room(
       id: propertyId,
       roomNumber: propertyId,

@@ -9,6 +9,21 @@ final sessionProvider = FutureProvider<String?>(
 final selectedPropertyProvider = NotifierProvider<SelectedProperty, String?>(
   SelectedProperty.new,
 );
+final roomSearchProvider = NotifierProvider<RoomSearch, String>(RoomSearch.new);
+final roomFloorProvider = NotifierProvider<RoomFloor, String?>(RoomFloor.new);
+
+class RoomSearch extends Notifier<String> {
+  @override
+  String build() => '';
+  void set(String value) => state = value.trim();
+}
+
+class RoomFloor extends Notifier<String?> {
+  @override
+  String? build() => null;
+  void set(String? value) => state = value;
+}
+
 final selectedOrganizationProvider =
     NotifierProvider<SelectedOrganization, String?>(SelectedOrganization.new);
 
@@ -82,14 +97,52 @@ class PgRepository {
 
   Future<List<Property>> properties() async =>
       pageData(await api.get('/properties'), Property.fromJson);
+  Future<({List<Property> items, bool hasMore})> dashboardProperties(
+    String search,
+    int page,
+  ) async {
+    final result = Map<String, dynamic>.from(
+      await api.get(
+        '/dashboard/properties',
+        query: {'search': search, 'page': page},
+      ) as Map,
+    );
+    return (
+      items: (result['items'] as List)
+          .map(
+            (item) => Property.fromJson(Map<String, dynamic>.from(item as Map)),
+          )
+          .toList(),
+      hasMore: result['hasMore'] as bool,
+    );
+  }
+
+  Future<String> dashboardPropertyName(String id) async {
+    final result = Map<String, dynamic>.from(
+      await api.get('/dashboard/properties/$id') as Map,
+    );
+    return result['name'] as String;
+  }
+
   Future<Property> createProperty(Map<String, dynamic> body) async =>
       Property.fromJson(
         Map<String, dynamic>.from(await api.post('/properties', body) as Map),
       );
-  Future<List<Room>> rooms(String propertyId, {int page = 1}) async => pageData(
+  Future<List<Room>> rooms(
+    String propertyId, {
+    int page = 1,
+    int limit = 20,
+    String search = '',
+    String? floor,
+  }) async => pageData(
     await api.get(
       '/properties/$propertyId/rooms-page',
-      query: {'page': page, 'limit': 20},
+      query: {
+        'page': page,
+        'limit': limit,
+        if (search.isNotEmpty) 'search': search,
+        'floor': ?floor,
+      },
     ),
     Room.fromJson,
   );
@@ -150,10 +203,16 @@ class PgRepository {
     String? propertyId, {
     int? month,
     int? year,
+    bool fy = false,
   }) async => Map<String, dynamic>.from(
     await api.get(
       '/dashboard/metrics',
-      query: {'propertyId': ?propertyId, 'month': ?month, 'year': ?year},
+      query: {
+        'propertyId': ?propertyId,
+        'month': ?month,
+        'year': ?year,
+        if (fy) 'fy': 'true',
+      },
     ) as Map,
   );
   Future<List<Map<String, dynamic>>> list(
@@ -296,8 +355,12 @@ class RoomsViewModel extends AsyncNotifier<List<Room>> {
   Future<List<Room>> build() async {
     page = 1;
     final propertyId = ref.watch(selectedPropertyProvider);
+    final search = ref.watch(roomSearchProvider);
+    final floor = ref.watch(roomFloorProvider);
     if (propertyId == null) return [];
-    final items = await ref.watch(repositoryProvider).rooms(propertyId);
+    final items = await ref
+        .watch(repositoryProvider)
+        .rooms(propertyId, search: search, floor: floor);
     hasMore = items.length == 20;
     return items;
   }
@@ -305,13 +368,19 @@ class RoomsViewModel extends AsyncNotifier<List<Room>> {
   Future<void> loadMore() async {
     if (!hasMore || loadingMore || state.asData == null) return;
     final propertyId = ref.read(selectedPropertyProvider);
+    final search = ref.read(roomSearchProvider);
+    final floor = ref.read(roomFloorProvider);
     if (propertyId == null) return;
     loadingMore = true;
     try {
       final next = await ref
           .read(repositoryProvider)
-          .rooms(propertyId, page: page + 1);
-      if (propertyId != ref.read(selectedPropertyProvider)) return;
+          .rooms(propertyId, page: page + 1, search: search, floor: floor);
+      if (propertyId != ref.read(selectedPropertyProvider) ||
+          search != ref.read(roomSearchProvider) ||
+          floor != ref.read(roomFloorProvider)) {
+        return;
+      }
       page++;
       hasMore = next.length == 20;
       state = AsyncData([...state.asData!.value, ...next]);
@@ -443,14 +512,31 @@ final dashboardProvider = FutureProvider<Map<String, dynamic>>(
       .watch(repositoryProvider)
       .dashboard(ref.watch(selectedPropertyProvider)),
 );
+final dashboardPropertiesProvider =
+    FutureProvider.family<
+      ({List<Property> items, bool hasMore}),
+      ({String search, int page})
+    >(
+      (ref, query) => ref
+          .watch(repositoryProvider)
+          .dashboardProperties(query.search, query.page),
+    );
+final dashboardPropertyNameProvider = FutureProvider.family<String, String>(
+  (ref, id) => ref.watch(repositoryProvider).dashboardPropertyName(id),
+);
 final dashboardPeriodProvider =
     FutureProvider.family<
       Map<String, dynamic>,
-      ({String? propertyId, int month, int year})
+      ({String? propertyId, int month, int year, bool fy})
     >(
       (ref, period) => ref
           .watch(repositoryProvider)
-          .dashboard(period.propertyId, month: period.month, year: period.year),
+          .dashboard(
+            period.propertyId,
+            month: period.month,
+            year: period.year,
+            fy: period.fy,
+          ),
     );
 final globalSearchProvider =
     FutureProvider.family<Map<String, List<Map<String, dynamic>>>, String>((

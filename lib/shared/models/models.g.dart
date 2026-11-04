@@ -11,6 +11,7 @@ _Property _$PropertyFromJson(Map<String, dynamic> json) => _Property(
   name: json['name'] as String,
   type: json['type'] as String,
   city: json['city'] as String?,
+  roomCount: (json['roomCount'] as num?)?.toInt() ?? 0,
 );
 
 Map<String, dynamic> _$PropertyToJson(_Property instance) => <String, dynamic>{
@@ -18,11 +19,13 @@ Map<String, dynamic> _$PropertyToJson(_Property instance) => <String, dynamic>{
   'name': instance.name,
   'type': instance.type,
   'city': instance.city,
+  'roomCount': instance.roomCount,
 };
 
 _Room _$RoomFromJson(Map<String, dynamic> json) => _Room(
   id: json['id'] as String,
   roomNumber: json['roomNumber'] as String,
+  floor: json['floor'] as String? ?? '0',
   sharingType: json['sharingType'] as String,
   rentAmount: (json['rentAmount'] as num).toInt(),
   status: json['status'] as String,
@@ -42,11 +45,17 @@ _Room _$RoomFromJson(Map<String, dynamic> json) => _Room(
   images:
       (json['images'] as List<dynamic>?)?.map((e) => e as String).toList() ??
       const [],
+  amenities:
+      (json['amenities'] as List<dynamic>?)?.map((e) => e as String).toList() ??
+      const [],
+  description: json['description'] as String?,
+  remarks: json['remarks'] as String?,
 );
 
 Map<String, dynamic> _$RoomToJson(_Room instance) => <String, dynamic>{
   'id': instance.id,
   'roomNumber': instance.roomNumber,
+  'floor': instance.floor,
   'sharingType': instance.sharingType,
   'rentAmount': instance.rentAmount,
   'status': instance.status,
@@ -58,6 +67,9 @@ Map<String, dynamic> _$RoomToJson(_Room instance) => <String, dynamic>{
   'property': instance.property,
   'beds': instance.beds,
   'images': instance.images,
+  'amenities': instance.amenities,
+  'description': instance.description,
+  'remarks': instance.remarks,
 };
 
 _PropertySummary _$PropertySummaryFromJson(Map<String, dynamic> json) =>
@@ -80,12 +92,18 @@ _Bed _$BedFromJson(Map<String, dynamic> json) => _Bed(
   id: json['id'] as String,
   bedNumber: json['bedNumber'] as String,
   status: json['status'] as String,
+  residents:
+      (json['residents'] as List<dynamic>?)
+          ?.map((e) => Resident.fromJson(e as Map<String, dynamic>))
+          .toList() ??
+      const [],
 );
 
 Map<String, dynamic> _$BedToJson(_Bed instance) => <String, dynamic>{
   'id': instance.id,
   'bedNumber': instance.bedNumber,
   'status': instance.status,
+  'residents': instance.residents,
 };
 
 _Resident _$ResidentFromJson(Map<String, dynamic> json) => _Resident(
