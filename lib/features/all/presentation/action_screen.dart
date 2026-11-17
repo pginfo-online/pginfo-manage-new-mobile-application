@@ -14,9 +14,16 @@ import '../../../app/di/providers.dart';
 import '../../../core/network/api_client.dart';
 import '../../../shared/components/common.dart';
 import '../../../shared/models/models.dart';
+import '../../tenants/presentation/tenant_skeleton.dart';
 
 class ActionScreen extends ConsumerStatefulWidget {
-  const ActionScreen({super.key, required this.name, required this.query});
+  const ActionScreen({
+    super.key,
+    required this.name,
+    required this.query,
+    this.onSaved,
+  });
+  final VoidCallback? onSaved;
   final String name;
   final Map<String, String> query;
   @override
@@ -33,6 +40,8 @@ class _ActionState extends ConsumerState<ActionScreen> {
   String recordStatus = 'NEW';
   DateTime date = DateTime.now();
   bool busy = false;
+  bool profileReady = false;
+  Object? profileError;
   XFile? formAttachment;
   XFile? idProofAttachment;
   XFile? agreementAttachment;
@@ -43,37 +52,15 @@ class _ActionState extends ConsumerState<ActionScreen> {
   void initState() {
     super.initState();
     selectedResident = widget.query['residentId'];
+    if (widget.query['type'] == 'LATE_FEE') type = 'LATE_FEE';
+    final amount = int.tryParse(widget.query['amount'] ?? '');
+    if (amount != null) {
+      field('amount').text = (amount / 100).toStringAsFixed(2);
+    }
     if (widget.name == 'complaint-new') type = 'MEDIUM';
     if (widget.name == 'bank') type = 'individual';
     if (widget.name == 'edit-tenant' && selectedResident != null) {
-      Future.microtask(() async {
-        try {
-          final person = await ref
-              .read(operationsViewModelProvider)
-              .residentDetails(selectedResident!);
-          if (!mounted) return;
-          for (final key in [
-            'firstName',
-            'lastName',
-            'mobile',
-            'email',
-            'whatsappNumber',
-            'emergencyContact',
-            'permanentAddress',
-            'parentName',
-            'parentPhone',
-            'notes',
-          ]) {
-            field(key).text = '${person[key] ?? ''}';
-          }
-          field('monthlyRent').text = ((person['monthlyRent'] as num) / 100)
-              .toStringAsFixed(2);
-          field('rentDueDay').text = '${person['rentDueDay'] ?? ''}';
-          setState(() => type = person['profession'] as String? ?? 'OTHER');
-        } catch (e) {
-          if (mounted) showError(context, e);
-        }
-      });
+      Future.microtask(loadProfile);
     }
     if (widget.name == 'expense' && widget.query['id'] != null) {
       Future.microtask(() async {
@@ -228,27 +215,72 @@ class _ActionState extends ConsumerState<ActionScreen> {
       if (picked != null) setState(() => date = picked);
     },
   );
-  Widget residentSelect() => Consumer(
-    builder: (context, ref, _) => PgAsync(
-      value: ref.watch(residentsProvider),
-      data: (people) => Padding(
-        padding: const EdgeInsets.only(bottom: 12),
-        child: DropdownButtonFormField<String>(
-          initialValue: selectedResident,
-          decoration: const InputDecoration(labelText: 'Tenant'),
-          items: people
-              .map(
-                (p) => DropdownMenuItem(
-                  value: p.id,
-                  child: Text('${p.firstName} ${p.lastName ?? ''}'),
-                ),
-              )
-              .toList(),
-          onChanged: (v) => setState(() => selectedResident = v),
-        ),
-      ),
-    ),
-  );
+  Future<void> loadProfile() async {
+    if (selectedResident == null || !mounted) return;
+    setState(() => profileError = null);
+    try {
+      final person = await ref
+          .read(operationsViewModelProvider)
+          .residentDetails(selectedResident!);
+      if (!mounted) return;
+      for (final key in [
+        'firstName',
+        'lastName',
+        'mobile',
+        'email',
+        'whatsappNumber',
+        'emergencyContact',
+        'permanentAddress',
+        'parentName',
+        'parentPhone',
+        'notes',
+      ]) {
+        field(key).text = '${person[key] ?? ''}';
+      }
+      field('monthlyRent').text = ((person['monthlyRent'] as num) / 100)
+          .toStringAsFixed(2);
+      field('rentDueDay').text = '${person['rentDueDay'] ?? ''}';
+      setState(() {
+        type = person['profession'] as String? ?? 'OTHER';
+        profileReady = true;
+      });
+    } catch (error) {
+      if (mounted) setState(() => profileError = error);
+    }
+  }
+
+  Widget residentSelect() => widget.query['residentId'] != null
+      ? Consumer(
+          builder: (context, ref, _) => PgAsync(
+            value: ref.watch(residentProvider(widget.query['residentId']!)),
+            data: (person) => ListTile(
+              title: Text(
+                '${person.firstName} ${person.lastName ?? ""}'.trim(),
+              ),
+            ),
+          ),
+        )
+      : Consumer(
+          builder: (context, ref, _) => PgAsync(
+            value: ref.watch(residentsProvider),
+            data: (people) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: DropdownButtonFormField<String>(
+                initialValue: selectedResident,
+                decoration: const InputDecoration(labelText: 'Tenant'),
+                items: people
+                    .map(
+                      (p) => DropdownMenuItem(
+                        value: p.id,
+                        child: Text('${p.firstName} ${p.lastName ?? ''}'),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (v) => setState(() => selectedResident = v),
+              ),
+            ),
+          ),
+        );
   Widget attachmentPicker(String label) => Padding(
     padding: const EdgeInsets.only(bottom: 12),
     child: OutlinedButton.icon(
@@ -288,6 +320,7 @@ class _ActionState extends ConsumerState<ActionScreen> {
           });
           ref.invalidate(dashboardProvider);
           ref.invalidate(tenantLedgerProvider(selectedResident!));
+          ref.invalidate(pagedListProvider);
           break;
         case 'record':
         case 'collect':
@@ -315,6 +348,7 @@ class _ActionState extends ConsumerState<ActionScreen> {
           ref.invalidate(dashboardProvider);
           ref.invalidate(residentsProvider);
           ref.invalidate(tenantLedgerProvider(selectedResident!));
+          ref.invalidate(pagedListProvider);
           break;
         case 'expense':
           if (property == null || categoryId == null) {
@@ -489,6 +523,8 @@ class _ActionState extends ConsumerState<ActionScreen> {
             'notes': field('notes').text.trim(),
           });
           ref.invalidate(residentsProvider);
+          ref.invalidate(residentProvider(id));
+          ref.invalidate(pagedListProvider);
           break;
         default:
           return;
@@ -496,7 +532,11 @@ class _ActionState extends ConsumerState<ActionScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(const SnackBar(content: Text('Saved successfully')));
-        context.pop();
+        if (widget.onSaved != null) {
+          widget.onSaved!();
+        } else {
+          context.pop();
+        }
       }
     } catch (e) {
       if (mounted) showError(context, e);
@@ -704,6 +744,20 @@ class _ActionState extends ConsumerState<ActionScreen> {
         );
         break;
       case 'edit-tenant':
+        if (!profileReady) {
+          content = profileError == null
+              ? const TenantSkeleton(TenantPlaceholder.fields)
+              : Column(
+                  children: [
+                    Text(profileError.toString()),
+                    TextButton(
+                      onPressed: loadProfile,
+                      child: const Text('Retry loading profile'),
+                    ),
+                  ],
+                );
+          break;
+        }
         content = Column(
           children: [
             input('firstName', 'First name'),
@@ -781,7 +835,7 @@ class _ActionState extends ConsumerState<ActionScreen> {
       case 'message':
         return _MessageScreen(residentId: widget.query['residentId']);
       case 'reminders':
-        return const _ReminderScreen();
+        return _ReminderScreen(kind: widget.query['kind']);
       case 'complaints':
         return const _ComplaintListScreen();
       case 'complaint':
@@ -791,7 +845,10 @@ class _ActionState extends ConsumerState<ActionScreen> {
       case 'receipt':
         return _ReceiptScreen(id: widget.query['id']);
       case 'report':
-        return _ReportScreen(type: widget.query['type'] ?? 'collections');
+        return _ReportScreen(
+          type: widget.query['type'] ?? 'collections',
+          propertyId: widget.query['propertyId'],
+        );
       default:
         return Scaffold(
           appBar: PgHeader(title: label),
@@ -812,7 +869,9 @@ class _ActionState extends ConsumerState<ActionScreen> {
             content,
             const SizedBox(height: 16),
             FilledButton(
-              onPressed: busy ? null : save,
+              onPressed: busy || (widget.name == 'edit-tenant' && !profileReady)
+                  ? null
+                  : save,
               child: Text(
                 busy
                     ? 'Saving…'
@@ -985,32 +1044,77 @@ class _MessageState extends ConsumerState<_MessageScreen> {
   }
 }
 
-class _ReminderScreen extends ConsumerWidget {
-  const _ReminderScreen();
+class _ReminderScreen extends ConsumerStatefulWidget {
+  const _ReminderScreen({this.kind});
+  final String? kind;
   @override
-  Widget build(BuildContext context, WidgetRef ref) => Scaffold(
-    appBar: const PgHeader(title: 'Bulk reminder'),
-    body: Center(
-      child: FilledButton(
-        onPressed: () async {
-          try {
-            await ref.read(operationsViewModelProvider).create(
-              '/announcements/reminders/rent',
-              {
-                if (ref.read(selectedPropertyProvider) != null)
-                  'propertyId': ref.read(selectedPropertyProvider),
-                'channel': 'BOTH',
-              },
-            );
-            if (context.mounted) context.pop();
-          } catch (e) {
-            if (context.mounted) showError(context, e);
-          }
-        },
-        child: const Text('Send rent reminders'),
+  ConsumerState<_ReminderScreen> createState() => _ReminderScreenState();
+}
+
+class _ReminderScreenState extends ConsumerState<_ReminderScreen> {
+  bool busy = false;
+  @override
+  Widget build(BuildContext context) {
+    final propertyId = ref.watch(selectedPropertyProvider);
+    final autopay = widget.kind == 'autopay';
+    final title = autopay ? 'Bulk Autopay reminders' : 'Bulk payment reminders';
+    return Scaffold(
+      appBar: PgHeader(title: title),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                propertyId == null
+                    ? 'All properties in this organization'
+                    : 'Currently selected property',
+              ),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: busy
+                    ? null
+                    : () async {
+                        setState(() => busy = true);
+                        try {
+                          final result =
+                              await ref
+                                      .read(operationsViewModelProvider)
+                                      .create('/announcements/reminders/rent', {
+                                        'propertyId': ?propertyId,
+                                        'kind': autopay ? 'autopay' : 'rent',
+                                        'channel': widget.kind == 'whatsapp'
+                                            ? 'WHATSAPP'
+                                            : 'BOTH',
+                                      })
+                                  as Map;
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(this.context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'WhatsApp: ${(result['whatsapp'] as Map?)?['accepted'] ?? 0} accepted. '
+                                'Email: ${(result['email'] as Map?)?['accepted'] ?? 0} accepted. '
+                                '${result['failedCount'] ?? 0} failed. '
+                                '${result['missingMandates'] ?? 0} without a pending mandate.',
+                              ),
+                            ),
+                          );
+                          this.context.pop();
+                        } catch (error) {
+                          if (mounted) showError(this.context, error);
+                        } finally {
+                          if (mounted) setState(() => busy = false);
+                        }
+                      },
+                child: Text(busy ? 'Sending…' : 'Send reminders'),
+              ),
+            ],
+          ),
+        ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 class _ComplaintListScreen extends ConsumerWidget {
@@ -1330,7 +1434,8 @@ class _ReceiptScreen extends ConsumerWidget {
 }
 
 class _ReportScreen extends ConsumerWidget {
-  const _ReportScreen({required this.type});
+  const _ReportScreen({required this.type, this.propertyId});
+  final String? propertyId;
   final String type;
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1340,7 +1445,9 @@ class _ReportScreen extends ConsumerWidget {
     return Scaffold(
       appBar: PgHeader(title: '$safeType report'),
       body: FutureBuilder<dynamic>(
-        future: ref.read(operationsViewModelProvider).report(safeType),
+        future: ref
+            .read(repositoryProvider)
+            .report(safeType, propertyId: propertyId),
         builder: (context, snap) {
           if (snap.hasError) return Center(child: Text(snap.error.toString()));
           if (!snap.hasData) {
@@ -1410,55 +1517,56 @@ class _PaymentSummary extends ConsumerWidget {
   final String residentId;
   final TextEditingController amount;
   @override
-  Widget build(
-    BuildContext context,
-    WidgetRef ref,
-  ) => FutureBuilder<List<Map<String, dynamic>>>(
-    future: ref
-        .read(operationsViewModelProvider)
-        .list('/billing/records', query: {'residentId': residentId}),
-    builder: (context, snap) {
-      if (!snap.hasData) return const SizedBox.shrink();
-      final records = snap.data!.where(
-        (e) => e['status'] != 'CANCELLED' && e['status'] != 'WAIVED',
-      );
-      final due = records.fold<int>(
-        0,
-        (total, e) =>
-            total +
-            ((e['amount'] as num).toInt() - (e['paidAmount'] as num).toInt()),
-      );
-      return ValueListenableBuilder<TextEditingValue>(
-        valueListenable: amount,
-        builder: (context, value, _) {
-          final received = tryParseRupees(value.text) ?? 0;
-          return PgCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Total dues: ${rupees(due)}'),
-                Text('Net receivable: ${rupees(due)}'),
-                Text('Remaining: ${rupees((due - received).clamp(0, due))}'),
-                ExpansionTile(
-                  title: const Text('View full breakup'),
-                  children: [
-                    for (final record in records)
-                      ListTile(
-                        title: Text('${record['type']}'),
-                        trailing: Text(
-                          rupees(
-                            (record['amount'] as num) -
-                                (record['paidAmount'] as num),
+  Widget build(BuildContext context, WidgetRef ref) {
+    final provider = tenantLedgerProvider(residentId);
+    return PgAsync(
+      value: ref.watch(provider),
+      placeholder: const TenantSkeleton(TenantPlaceholder.fields),
+      retry: () => ref.invalidate(provider),
+      data: (ledger) {
+        final records = (ledger['dues'] ?? []).where(
+          (record) =>
+              record['status'] != 'CANCELLED' &&
+              (record['amount'] as num) > (record['paidAmount'] as num),
+        );
+        final due = records.fold<int>(
+          0,
+          (total, e) =>
+              total +
+              ((e['amount'] as num).toInt() - (e['paidAmount'] as num).toInt()),
+        );
+        return ValueListenableBuilder<TextEditingValue>(
+          valueListenable: amount,
+          builder: (context, value, _) {
+            final received = tryParseRupees(value.text) ?? 0;
+            return PgCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Total dues: ${rupees(due)}'),
+                  Text('Net receivable: ${rupees(due)}'),
+                  Text('Remaining: ${rupees((due - received).clamp(0, due))}'),
+                  ExpansionTile(
+                    title: const Text('View full breakup'),
+                    children: [
+                      for (final record in records)
+                        ListTile(
+                          title: Text('${record['type']}'),
+                          trailing: Text(
+                            rupees(
+                              (record['amount'] as num) -
+                                  (record['paidAmount'] as num),
+                            ),
                           ),
                         ),
-                      ),
-                  ],
-                ),
-              ],
-            ),
-          );
-        },
-      );
-    },
-  );
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
 }

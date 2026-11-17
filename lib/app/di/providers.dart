@@ -186,8 +186,11 @@ class PgRepository {
       Map<String, dynamic>.from(await api.get('/complaints/$id') as Map);
   Future<Map<String, dynamic>> receipt(String id) async =>
       Map<String, dynamic>.from(await api.get('/payments/$id/receipt') as Map);
-  Future<String> report(String type) async =>
-      (await api.get('/reports/$type/csv')).toString();
+  Future<String> report(String type, {String? propertyId}) async =>
+      (await api.get(
+        '/reports/$type/csv',
+        query: {'propertyId': ?propertyId},
+      )).toString();
   Future<List<Map<String, dynamic>>> activity(
     String entityType,
     String entityId,
@@ -402,6 +405,7 @@ class PagedQuery {
     this.search = '',
     this.status,
     this.filterName,
+    this.entityType,
     this.filterValue,
   });
   final String path;
@@ -409,6 +413,7 @@ class PagedQuery {
   final String search;
   final String? status;
   final String? filterName;
+  final String? entityType;
   final String? filterValue;
 
   @override
@@ -419,11 +424,19 @@ class PagedQuery {
       other.search == search &&
       other.status == status &&
       other.filterName == filterName &&
+      other.entityType == entityType &&
       other.filterValue == filterValue;
 
   @override
-  int get hashCode =>
-      Object.hash(path, propertyId, search, status, filterName, filterValue);
+  int get hashCode => Object.hash(
+    path,
+    propertyId,
+    search,
+    status,
+    filterName,
+    filterValue,
+    entityType,
+  );
 }
 
 class PagedListViewModel extends AsyncNotifier<List<Map<String, dynamic>>> {
@@ -432,6 +445,7 @@ class PagedListViewModel extends AsyncNotifier<List<Map<String, dynamic>>> {
   int page = 1;
   bool hasMore = true;
   bool loadingMore = false;
+  Object request = Object();
 
   Map<String, dynamic> params(int requestedPage) => {
     'page': requestedPage,
@@ -439,32 +453,39 @@ class PagedListViewModel extends AsyncNotifier<List<Map<String, dynamic>>> {
     'propertyId': ?query.propertyId,
     if (query.search.trim().isNotEmpty) 'search': query.search.trim(),
     'status': ?query.status,
+    'entityType': ?query.entityType,
     if (query.filterName != null && query.filterValue != null)
       query.filterName!: query.filterValue,
   };
 
   @override
   Future<List<Map<String, dynamic>>> build() async {
+    final generation = request = Object();
+    loadingMore = false;
     page = 1;
     final items = await ref
         .watch(repositoryProvider)
         .list(query.path, query: params(page));
-    hasMore = items.length == 20;
+    if (ref.mounted && identical(request, generation)) {
+      hasMore = items.length == 20;
+    }
     return items;
   }
 
   Future<void> loadMore() async {
     if (!hasMore || loadingMore || state.asData == null) return;
     loadingMore = true;
+    final generation = request;
     try {
       final next = await ref
           .read(repositoryProvider)
           .list(query.path, query: params(page + 1));
+      if (!ref.mounted || !identical(request, generation)) return;
       page++;
       hasMore = next.length == 20;
       state = AsyncData([...state.asData!.value, ...next]);
     } finally {
-      loadingMore = false;
+      if (identical(request, generation)) loadingMore = false;
     }
   }
 }
@@ -538,8 +559,8 @@ final dashboardPeriodProvider =
             fy: period.fy,
           ),
     );
-final globalSearchProvider =
-    FutureProvider.family<Map<String, List<Map<String, dynamic>>>, String>((
+final globalSearchProvider = FutureProvider.autoDispose
+    .family<Map<String, List<Map<String, dynamic>>>, String>((
       ref,
       query,
     ) async {
@@ -575,15 +596,28 @@ final globalSearchProvider =
             .toList(),
       };
     });
-final tenantLedgerProvider =
-    FutureProvider.family<Map<String, List<Map<String, dynamic>>>, String>((
+final tenantLedgerProvider = FutureProvider.autoDispose
+    .family<Map<String, List<Map<String, dynamic>>>, String>((
       ref,
       residentId,
     ) async {
       final repo = ref.watch(repositoryProvider);
+      Future<List<Map<String, dynamic>>> history(String path) async {
+        final all = <Map<String, dynamic>>[];
+        for (var page = 1; ; page++) {
+          final items = await repo.list(
+            path,
+            query: {'residentId': residentId, 'page': page, 'limit': 100},
+          );
+          if (!ref.mounted) return all;
+          all.addAll(items);
+          if (items.length < 100) return all;
+        }
+      }
+
       final result = await Future.wait([
-        repo.list('/billing/records', query: {'residentId': residentId}),
-        repo.list('/payments', query: {'residentId': residentId}),
+        history('/billing/records'),
+        history('/payments'),
       ]);
       return {'dues': result[0], 'payments': result[1]};
     });

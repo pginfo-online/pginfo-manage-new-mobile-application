@@ -1,5 +1,10 @@
 import 'dart:async';
 
+import 'tenant_skeleton.dart';
+import 'tenant_actions.dart' show allocationRoomsProvider;
+
+import 'package:uuid/uuid.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -23,13 +28,15 @@ class _OpeningEntry {
     this.collectedAmount = 0,
     this.dueEndDate,
     this.description = '',
+    this.type = 'OTHER',
+    this.collectionMode = 'OTHER',
     this.attachments = const [],
   });
   final int amount, collectedAmount;
   final DateTime dueDate;
   final DateTime? dueEndDate;
   final String description;
-  String get collectionMode => 'OTHER';
+  final String type, collectionMode;
   final List<XFile> attachments;
 }
 
@@ -39,7 +46,10 @@ class _AddTenantState extends ConsumerState<AddTenantScreen>
   final first = TextEditingController(),
       last = TextEditingController(),
       phone = TextEditingController(),
-      alternate = TextEditingController();
+      alternate = TextEditingController(),
+      parentName = TextEditingController(),
+      parentPhone = TextEditingController();
+  final onboardingKey = const Uuid().v4();
   final rent = TextEditingController(),
       deposit = TextEditingController(text: '0'),
       dueDay = TextEditingController(text: '1');
@@ -48,7 +58,7 @@ class _AddTenantState extends ConsumerState<AddTenantScreen>
       agreementMonths = TextEditingController(text: '12'),
       remarks = TextEditingController();
   final entries = <_OpeningEntry>[];
-  String? roomId, bedId;
+  String? roomId, bedId, propertyId, allocationLabel;
   String stayType = 'LONG_TERM', tenantType = 'OTHER';
   bool whatsapp = true, busy = false;
   DateTime moveIn = DateTime.now();
@@ -56,6 +66,7 @@ class _AddTenantState extends ConsumerState<AddTenantScreen>
   @override
   void initState() {
     super.initState();
+    propertyId = ref.read(selectedPropertyProvider);
     roomId = widget.initialRoomId;
     bedId = widget.initialBedId;
   }
@@ -68,6 +79,8 @@ class _AddTenantState extends ConsumerState<AddTenantScreen>
       last,
       phone,
       alternate,
+      parentName,
+      parentPhone,
       rent,
       deposit,
       dueDay,
@@ -93,7 +106,7 @@ class _AddTenantState extends ConsumerState<AddTenantScreen>
   );
 
   Future<void> selectRoom() async {
-    final property = ref.read(selectedPropertyProvider);
+    final property = propertyId;
     if (property == null) {
       showError(context, 'Select a property first');
       return;
@@ -129,68 +142,66 @@ class _AddTenantState extends ConsumerState<AddTenantScreen>
                   ),
                 ),
                 Expanded(
-                  child: FutureBuilder<List<Room>>(
-                    key: ValueKey('$property:$search'),
-                    future: ref
-                        .read(repositoryProvider)
-                        .rooms(property, search: search, limit: 100),
-                    builder: (context, snapshot) {
-                      if (!snapshot.hasData) {
-                        return snapshot.hasError
-                            ? Center(
-                                child: TextButton(
-                                  onPressed: () => setSheet(() {}),
-                                  child: const Text('Retry loading rooms'),
+                  child: Consumer(
+                    builder: (context, sheetRef, _) => PgAsync(
+                      value: sheetRef.watch(
+                        allocationRoomsProvider((property, search)),
+                      ),
+                      placeholder: const TenantSkeleton(
+                        TenantPlaceholder.fields,
+                      ),
+                      retry: () => sheetRef.invalidate(
+                        allocationRoomsProvider((property, search)),
+                      ),
+                      data: (rooms) {
+                        if (rooms.isEmpty) {
+                          return const Center(
+                            child: Text('No rooms match your search.'),
+                          );
+                        }
+                        return ListView(
+                          children: [
+                            for (final room in rooms)
+                              ExpansionTile(
+                                title: Text('Room ${room.roomNumber}'),
+                                subtitle: Text(
+                                  '${room.beds.where((bed) => bed.status == 'AVAILABLE').length} available beds',
                                 ),
-                              )
-                            : const _TenantSkeleton();
-                      }
-                      final rooms = snapshot.data!;
-                      if (rooms.isEmpty) {
-                        return const Center(
-                          child: Text('No rooms match your search.'),
-                        );
-                      }
-                      return ListView(
-                        children: [
-                          for (final room in rooms)
-                            ExpansionTile(
-                              title: Text('Room ${room.roomNumber}'),
-                              subtitle: Text(
-                                '${room.beds.where((bed) => bed.status == 'AVAILABLE').length} available beds',
-                              ),
-                              children: [
-                                for (final bed in room.beds.where(
-                                  (bed) => bed.status == 'AVAILABLE',
-                                ))
+                                children: [
+                                  for (final bed in room.beds.where(
+                                    (bed) => bed.status == 'AVAILABLE',
+                                  ))
+                                    ListTile(
+                                      leading: const Icon(Icons.bed_outlined),
+                                      title: Text('Bed ${bed.bedNumber}'),
+                                      onTap: () {
+                                        setState(() {
+                                          roomId = room.id;
+                                          bedId = bed.id;
+                                          allocationLabel =
+                                              'Room ${room.roomNumber} · Bed ${bed.bedNumber}';
+                                        });
+                                        Navigator.pop(sheetContext);
+                                      },
+                                    ),
                                   ListTile(
-                                    leading: const Icon(Icons.bed_outlined),
-                                    title: Text('Bed ${bed.bedNumber}'),
+                                    title: const Text(
+                                      'Select room without a bed',
+                                    ),
                                     onTap: () {
                                       setState(() {
                                         roomId = room.id;
-                                        bedId = bed.id;
+                                        bedId = null;
                                       });
                                       Navigator.pop(sheetContext);
                                     },
                                   ),
-                                ListTile(
-                                  title: const Text(
-                                    'Select room without a bed',
-                                  ),
-                                  onTap: () {
-                                    setState(() {
-                                      roomId = room.id;
-                                      bedId = null;
-                                    });
-                                    Navigator.pop(sheetContext);
-                                  },
-                                ),
-                              ],
-                            ),
-                        ],
-                      );
-                    },
+                                ],
+                              ),
+                          ],
+                        );
+                      },
+                    ),
                   ),
                 ),
               ],
@@ -210,11 +221,13 @@ class _AddTenantState extends ConsumerState<AddTenantScreen>
       text: existing == null
           ? ''
           : ((collection ? existing.collectedAmount : existing.amount) / 100)
-                .toStringAsFixed(0),
+                .toStringAsFixed(2),
     );
     final description = TextEditingController(
       text: existing?.description ?? '',
     );
+    var type = existing?.type ?? 'OTHER';
+    var mode = existing?.collectionMode ?? 'OTHER';
     var due = existing?.dueDate ?? DateTime.now();
     DateTime? end = existing?.dueEndDate;
     var attachments = <XFile>[...?existing?.attachments];
@@ -240,6 +253,23 @@ class _AddTenantState extends ConsumerState<AddTenantScreen>
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
                 const SizedBox(height: 12),
+                if (collection)
+                  _dropdown('Collection mode', mode, const {
+                    'CASH': 'Cash',
+                    'UPI': 'UPI',
+                    'BANK_TRANSFER': 'Bank transfer',
+                    'CHEQUE': 'Cheque',
+                    'OTHER': 'Other',
+                  }, (value) => setSheet(() => mode = value))
+                else
+                  _dropdown('Due type', type, const {
+                    'RENT': 'Rent',
+                    'ELECTRICITY': 'Electricity',
+                    'WATER': 'Water',
+                    'MAINTENANCE': 'Maintenance',
+                    'LATE_FEE': 'Late fee',
+                    'OTHER': 'Other',
+                  }, (value) => setSheet(() => type = value)),
                 PgField(
                   collection ? 'Collection Amount (₹)' : 'Due Amount (₹)',
                   controller: amount,
@@ -291,7 +321,16 @@ class _AddTenantState extends ConsumerState<AddTenantScreen>
                         showError(sheetContext, 'Enter a positive amount');
                         return;
                       }
+                      if (!collection && end != null && end!.isBefore(due)) {
+                        showError(
+                          sheetContext,
+                          'Due end date must be on or after the due date',
+                        );
+                        return;
+                      }
                       final next = _OpeningEntry(
+                        type: type,
+                        collectionMode: mode,
                         amount: collection ? 0 : value,
                         collectedAmount: collection ? value : 0,
                         dueDate: due,
@@ -322,7 +361,7 @@ class _AddTenantState extends ConsumerState<AddTenantScreen>
   }
 
   Future<void> save() async {
-    final property = ref.read(selectedPropertyProvider);
+    final property = propertyId;
     if (property == null) {
       showError(context, 'Select a property');
       return;
@@ -331,6 +370,12 @@ class _AddTenantState extends ConsumerState<AddTenantScreen>
         mobileValidator(phone.text.trim()) != null) {
       tabs.animateTo(0);
       showError(context, 'Enter a name and valid phone number');
+      return;
+    }
+    if (parentPhone.text.trim().isNotEmpty &&
+        mobileValidator(parentPhone.text.trim()) != null) {
+      tabs.animateTo(0);
+      showError(context, 'Enter a valid parent phone number');
       return;
     }
     if (alternate.text.trim().isNotEmpty &&
@@ -356,8 +401,10 @@ class _AddTenantState extends ConsumerState<AddTenantScreen>
         lock < 0 ||
         notice == null ||
         notice < 0 ||
+        notice > 365 ||
         agreement == null ||
         agreement < 1 ||
+        agreement > 120 ||
         (moveOut != null && moveOut!.isBefore(moveIn))) {
       tabs.animateTo(1);
       showError(context, 'Check the stay dates and periods');
@@ -369,9 +416,10 @@ class _AddTenantState extends ConsumerState<AddTenantScreen>
       final balances = await Future.wait(
         entries.map(
           (e) async => {
-            'type': 'OTHER',
+            'type': e.type,
             'amount': e.amount,
             'collectedAmount': e.collectedAmount,
+            if (e.collectedAmount > 0) 'collectionDate': iso(e.dueDate),
             'dueDate': iso(e.dueDate),
             if (e.dueEndDate != null) 'dueEndDate': iso(e.dueEndDate!),
             'description': e.description,
@@ -394,6 +442,11 @@ class _AddTenantState extends ConsumerState<AddTenantScreen>
       }
       await repository.createResident({
         'propertyId': property,
+        'onboardingKey': onboardingKey,
+        if (parentName.text.trim().isNotEmpty)
+          'parentName': parentName.text.trim(),
+        if (parentPhone.text.trim().isNotEmpty)
+          'parentPhone': parentPhone.text.trim(),
         'firstName': first.text.trim(),
         'lastName': last.text.trim(),
         'mobile': phone.text.trim(),
@@ -422,8 +475,8 @@ class _AddTenantState extends ConsumerState<AddTenantScreen>
         'openingBalances': balances,
       });
       ref.invalidate(residentsProvider);
+      ref.invalidate(pagedListProvider);
       ref.invalidate(roomsProvider);
-      ref.invalidate(propertiesProvider);
       ref.invalidate(dashboardProvider);
       if (mounted) context.pop();
     } catch (error) {
@@ -436,10 +489,6 @@ class _AddTenantState extends ConsumerState<AddTenantScreen>
   @override
   Widget build(BuildContext context) {
     final properties = ref.watch(propertiesProvider);
-    final roomValue = ref.watch(roomsProvider);
-    final rooms = roomValue.asData?.value ?? <Room>[];
-    final chosen = rooms.where((room) => room.id == roomId).firstOrNull;
-    final propertyId = ref.watch(selectedPropertyProvider);
     return Scaffold(
       backgroundColor: const Color(0xfff3f3f3),
       appBar: AppBar(
@@ -494,6 +543,12 @@ class _AddTenantState extends ConsumerState<AddTenantScreen>
                               controller: alternate,
                               keyboardType: TextInputType.phone,
                             ),
+                            PgField('Parent name', controller: parentName),
+                            PgField(
+                              'Parent phone',
+                              controller: parentPhone,
+                              keyboardType: TextInputType.phone,
+                            ),
                           ],
                         ),
                       ),
@@ -504,7 +559,8 @@ class _AddTenantState extends ConsumerState<AddTenantScreen>
                       title: const Text('Send WhatsApp Reminder'),
                       contentPadding: EdgeInsets.zero,
                     ),
-                    if (properties.isLoading) const _TenantSkeleton(),
+                    if (properties.isLoading)
+                      const TenantSkeleton(TenantPlaceholder.fields),
                     if (properties.hasError)
                       TextButton(
                         onPressed: () => ref.invalidate(propertiesProvider),
@@ -529,22 +585,15 @@ class _AddTenantState extends ConsumerState<AddTenantScreen>
                                     ),
                                 ],
                                 onChanged: (id) {
-                                  ref
-                                      .read(selectedPropertyProvider.notifier)
-                                      .select(id);
                                   setState(() {
+                                    propertyId = id;
+                                    allocationLabel = null;
                                     roomId = null;
                                     bedId = null;
                                   });
                                 },
                               ),
                             const SizedBox(height: 12),
-                            if (roomValue.isLoading) const _TenantSkeleton(),
-                            if (roomValue.hasError)
-                              TextButton(
-                                onPressed: () => ref.invalidate(roomsProvider),
-                                child: const Text('Retry loading rooms'),
-                              ),
                             ListTile(
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
@@ -554,11 +603,10 @@ class _AddTenantState extends ConsumerState<AddTenantScreen>
                               ),
                               title: const Text('Room / Bed'),
                               subtitle: Text(
-                                chosen == null
-                                    ? roomId == null
-                                          ? 'Select a room and bed'
-                                          : 'Room selected'
-                                    : 'Room ${chosen.roomNumber}${bedId == null ? '' : ' · Bed ${chosen.beds.where((b) => b.id == bedId).firstOrNull?.bedNumber ?? ''}'}',
+                                allocationLabel ??
+                                    (roomId == null
+                                        ? 'Select a room and bed'
+                                        : 'Room selected'),
                               ),
                               trailing: const Icon(Icons.keyboard_arrow_down),
                               onTap: selectRoom,
@@ -778,66 +826,6 @@ class _AddTenantState extends ConsumerState<AddTenantScreen>
       onChanged: (v) {
         if (v != null) onChanged(v);
       },
-    ),
-  );
-}
-
-class _TenantSkeleton extends StatefulWidget {
-  const _TenantSkeleton();
-  @override
-  State<_TenantSkeleton> createState() => _TenantSkeletonState();
-}
-
-class _TenantSkeletonState extends State<_TenantSkeleton>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController animation = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1400),
-  )..repeat();
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (MediaQuery.disableAnimationsOf(context)) {
-      animation.stop();
-    } else if (!animation.isAnimating) {
-      animation.repeat();
-    }
-  }
-
-  @override
-  void dispose() {
-    animation.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => Semantics(
-    label: 'Loading tenant form options',
-    child: ExcludeSemantics(
-      child: AnimatedBuilder(
-        animation: animation,
-        builder: (context, _) => Column(
-          children: [
-            for (var i = 0; i < 2; i++)
-              Container(
-                height: 56,
-                margin: const EdgeInsets.only(bottom: 12),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  gradient: LinearGradient(
-                    begin: Alignment(-1 + animation.value * 2, 0),
-                    end: Alignment(animation.value * 2, 0),
-                    colors: const [
-                      Color(0xffeceef3),
-                      Color(0xfffafbfc),
-                      Color(0xffeceef3),
-                    ],
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
     ),
   );
 }

@@ -70,20 +70,24 @@ class PgAsync<T> extends StatelessWidget {
     required this.data,
     this.empty = 'Nothing here yet',
     this.retry,
+    this.placeholder,
   });
   final AsyncValue<T> value;
   final Widget Function(T) data;
   final String empty;
   final VoidCallback? retry;
+  final Widget? placeholder;
   @override
   Widget build(BuildContext context) => value.when(
     data: data,
-    loading: () => const Center(
-      child: Padding(
-        padding: EdgeInsets.all(32),
-        child: CircularProgressIndicator(),
-      ),
-    ),
+    loading: () =>
+        placeholder ??
+        const Center(
+          child: Padding(
+            padding: EdgeInsets.all(32),
+            child: CircularProgressIndicator(),
+          ),
+        ),
     error: (e, _) => Center(
       child: Padding(
         padding: const EdgeInsets.all(24),

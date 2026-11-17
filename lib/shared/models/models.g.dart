@@ -127,6 +127,12 @@ _Resident _$ResidentFromJson(Map<String, dynamic> json) => _Resident(
   roomId: json['roomId'] as String?,
   bedId: json['bedId'] as String?,
   joiningDate: json['joiningDate'] as String?,
+  moveOutDate: json['moveOutDate'] as String?,
+  expectedVacatingDate: json['expectedVacatingDate'] as String?,
+  property: json['property'] == null
+      ? null
+      : PropertySummary.fromJson(json['property'] as Map<String, dynamic>),
+  autopayActive: json['autopayActive'] as bool? ?? false,
   status: json['status'] as String?,
   notes: json['notes'] as String?,
   room: json['room'] == null
@@ -159,6 +165,10 @@ Map<String, dynamic> _$ResidentToJson(_Resident instance) => <String, dynamic>{
   'roomId': instance.roomId,
   'bedId': instance.bedId,
   'joiningDate': instance.joiningDate,
+  'moveOutDate': instance.moveOutDate,
+  'expectedVacatingDate': instance.expectedVacatingDate,
+  'property': instance.property,
+  'autopayActive': instance.autopayActive,
   'status': instance.status,
   'notes': instance.notes,
   'room': instance.room,

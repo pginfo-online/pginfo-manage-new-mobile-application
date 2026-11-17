@@ -1169,7 +1169,7 @@ as List<Resident>,
 /// @nodoc
 mixin _$Resident {
 
- String get id; String get firstName; String? get lastName; String get mobile; String? get email; String? get whatsappNumber; String? get emergencyContact; String? get permanentAddress; String? get parentName; String? get parentPhone; String? get idProofUrl; String? get agreementUrl; String? get profession; int get monthlyRent; int get securityDeposit; int? get rentDueDay; String? get propertyId; String? get roomId; String? get bedId; String? get joiningDate; String? get status; String? get notes; TenantRoomSummary? get room; TenantBedSummary? get bed; int get dues;
+ String get id; String get firstName; String? get lastName; String get mobile; String? get email; String? get whatsappNumber; String? get emergencyContact; String? get permanentAddress; String? get parentName; String? get parentPhone; String? get idProofUrl; String? get agreementUrl; String? get profession; int get monthlyRent; int get securityDeposit; int? get rentDueDay; String? get propertyId; String? get roomId; String? get bedId; String? get joiningDate; String? get moveOutDate; String? get expectedVacatingDate; PropertySummary? get property; bool get autopayActive; String? get status; String? get notes; TenantRoomSummary? get room; TenantBedSummary? get bed; int get dues;
 /// Create a copy of Resident
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -1182,16 +1182,16 @@ $ResidentCopyWith<Resident> get copyWith => _$ResidentCopyWithImpl<Resident>(thi
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is Resident&&(identical(other.id, id) || other.id == id)&&(identical(other.firstName, firstName) || other.firstName == firstName)&&(identical(other.lastName, lastName) || other.lastName == lastName)&&(identical(other.mobile, mobile) || other.mobile == mobile)&&(identical(other.email, email) || other.email == email)&&(identical(other.whatsappNumber, whatsappNumber) || other.whatsappNumber == whatsappNumber)&&(identical(other.emergencyContact, emergencyContact) || other.emergencyContact == emergencyContact)&&(identical(other.permanentAddress, permanentAddress) || other.permanentAddress == permanentAddress)&&(identical(other.parentName, parentName) || other.parentName == parentName)&&(identical(other.parentPhone, parentPhone) || other.parentPhone == parentPhone)&&(identical(other.idProofUrl, idProofUrl) || other.idProofUrl == idProofUrl)&&(identical(other.agreementUrl, agreementUrl) || other.agreementUrl == agreementUrl)&&(identical(other.profession, profession) || other.profession == profession)&&(identical(other.monthlyRent, monthlyRent) || other.monthlyRent == monthlyRent)&&(identical(other.securityDeposit, securityDeposit) || other.securityDeposit == securityDeposit)&&(identical(other.rentDueDay, rentDueDay) || other.rentDueDay == rentDueDay)&&(identical(other.propertyId, propertyId) || other.propertyId == propertyId)&&(identical(other.roomId, roomId) || other.roomId == roomId)&&(identical(other.bedId, bedId) || other.bedId == bedId)&&(identical(other.joiningDate, joiningDate) || other.joiningDate == joiningDate)&&(identical(other.status, status) || other.status == status)&&(identical(other.notes, notes) || other.notes == notes)&&(identical(other.room, room) || other.room == room)&&(identical(other.bed, bed) || other.bed == bed)&&(identical(other.dues, dues) || other.dues == dues));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is Resident&&(identical(other.id, id) || other.id == id)&&(identical(other.firstName, firstName) || other.firstName == firstName)&&(identical(other.lastName, lastName) || other.lastName == lastName)&&(identical(other.mobile, mobile) || other.mobile == mobile)&&(identical(other.email, email) || other.email == email)&&(identical(other.whatsappNumber, whatsappNumber) || other.whatsappNumber == whatsappNumber)&&(identical(other.emergencyContact, emergencyContact) || other.emergencyContact == emergencyContact)&&(identical(other.permanentAddress, permanentAddress) || other.permanentAddress == permanentAddress)&&(identical(other.parentName, parentName) || other.parentName == parentName)&&(identical(other.parentPhone, parentPhone) || other.parentPhone == parentPhone)&&(identical(other.idProofUrl, idProofUrl) || other.idProofUrl == idProofUrl)&&(identical(other.agreementUrl, agreementUrl) || other.agreementUrl == agreementUrl)&&(identical(other.profession, profession) || other.profession == profession)&&(identical(other.monthlyRent, monthlyRent) || other.monthlyRent == monthlyRent)&&(identical(other.securityDeposit, securityDeposit) || other.securityDeposit == securityDeposit)&&(identical(other.rentDueDay, rentDueDay) || other.rentDueDay == rentDueDay)&&(identical(other.propertyId, propertyId) || other.propertyId == propertyId)&&(identical(other.roomId, roomId) || other.roomId == roomId)&&(identical(other.bedId, bedId) || other.bedId == bedId)&&(identical(other.joiningDate, joiningDate) || other.joiningDate == joiningDate)&&(identical(other.moveOutDate, moveOutDate) || other.moveOutDate == moveOutDate)&&(identical(other.expectedVacatingDate, expectedVacatingDate) || other.expectedVacatingDate == expectedVacatingDate)&&(identical(other.property, property) || other.property == property)&&(identical(other.autopayActive, autopayActive) || other.autopayActive == autopayActive)&&(identical(other.status, status) || other.status == status)&&(identical(other.notes, notes) || other.notes == notes)&&(identical(other.room, room) || other.room == room)&&(identical(other.bed, bed) || other.bed == bed)&&(identical(other.dues, dues) || other.dues == dues));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hashAll([runtimeType,id,firstName,lastName,mobile,email,whatsappNumber,emergencyContact,permanentAddress,parentName,parentPhone,idProofUrl,agreementUrl,profession,monthlyRent,securityDeposit,rentDueDay,propertyId,roomId,bedId,joiningDate,status,notes,room,bed,dues]);
+int get hashCode => Object.hashAll([runtimeType,id,firstName,lastName,mobile,email,whatsappNumber,emergencyContact,permanentAddress,parentName,parentPhone,idProofUrl,agreementUrl,profession,monthlyRent,securityDeposit,rentDueDay,propertyId,roomId,bedId,joiningDate,moveOutDate,expectedVacatingDate,property,autopayActive,status,notes,room,bed,dues]);
 
 @override
 String toString() {
-  return 'Resident(id: $id, firstName: $firstName, lastName: $lastName, mobile: $mobile, email: $email, whatsappNumber: $whatsappNumber, emergencyContact: $emergencyContact, permanentAddress: $permanentAddress, parentName: $parentName, parentPhone: $parentPhone, idProofUrl: $idProofUrl, agreementUrl: $agreementUrl, profession: $profession, monthlyRent: $monthlyRent, securityDeposit: $securityDeposit, rentDueDay: $rentDueDay, propertyId: $propertyId, roomId: $roomId, bedId: $bedId, joiningDate: $joiningDate, status: $status, notes: $notes, room: $room, bed: $bed, dues: $dues)';
+  return 'Resident(id: $id, firstName: $firstName, lastName: $lastName, mobile: $mobile, email: $email, whatsappNumber: $whatsappNumber, emergencyContact: $emergencyContact, permanentAddress: $permanentAddress, parentName: $parentName, parentPhone: $parentPhone, idProofUrl: $idProofUrl, agreementUrl: $agreementUrl, profession: $profession, monthlyRent: $monthlyRent, securityDeposit: $securityDeposit, rentDueDay: $rentDueDay, propertyId: $propertyId, roomId: $roomId, bedId: $bedId, joiningDate: $joiningDate, moveOutDate: $moveOutDate, expectedVacatingDate: $expectedVacatingDate, property: $property, autopayActive: $autopayActive, status: $status, notes: $notes, room: $room, bed: $bed, dues: $dues)';
 }
 
 
@@ -1202,11 +1202,11 @@ abstract mixin class $ResidentCopyWith<$Res>  {
   factory $ResidentCopyWith(Resident value, $Res Function(Resident) _then) = _$ResidentCopyWithImpl;
 @useResult
 $Res call({
- String id, String firstName, String? lastName, String mobile, String? email, String? whatsappNumber, String? emergencyContact, String? permanentAddress, String? parentName, String? parentPhone, String? idProofUrl, String? agreementUrl, String? profession, int monthlyRent, int securityDeposit, int? rentDueDay, String? propertyId, String? roomId, String? bedId, String? joiningDate, String? status, String? notes, TenantRoomSummary? room, TenantBedSummary? bed, int dues
+ String id, String firstName, String? lastName, String mobile, String? email, String? whatsappNumber, String? emergencyContact, String? permanentAddress, String? parentName, String? parentPhone, String? idProofUrl, String? agreementUrl, String? profession, int monthlyRent, int securityDeposit, int? rentDueDay, String? propertyId, String? roomId, String? bedId, String? joiningDate, String? moveOutDate, String? expectedVacatingDate, PropertySummary? property, bool autopayActive, String? status, String? notes, TenantRoomSummary? room, TenantBedSummary? bed, int dues
 });
 
 
-$TenantRoomSummaryCopyWith<$Res>? get room;$TenantBedSummaryCopyWith<$Res>? get bed;
+$PropertySummaryCopyWith<$Res>? get property;$TenantRoomSummaryCopyWith<$Res>? get room;$TenantBedSummaryCopyWith<$Res>? get bed;
 
 }
 /// @nodoc
@@ -1219,7 +1219,7 @@ class _$ResidentCopyWithImpl<$Res>
 
 /// Create a copy of Resident
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? firstName = null,Object? lastName = freezed,Object? mobile = null,Object? email = freezed,Object? whatsappNumber = freezed,Object? emergencyContact = freezed,Object? permanentAddress = freezed,Object? parentName = freezed,Object? parentPhone = freezed,Object? idProofUrl = freezed,Object? agreementUrl = freezed,Object? profession = freezed,Object? monthlyRent = null,Object? securityDeposit = null,Object? rentDueDay = freezed,Object? propertyId = freezed,Object? roomId = freezed,Object? bedId = freezed,Object? joiningDate = freezed,Object? status = freezed,Object? notes = freezed,Object? room = freezed,Object? bed = freezed,Object? dues = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? firstName = null,Object? lastName = freezed,Object? mobile = null,Object? email = freezed,Object? whatsappNumber = freezed,Object? emergencyContact = freezed,Object? permanentAddress = freezed,Object? parentName = freezed,Object? parentPhone = freezed,Object? idProofUrl = freezed,Object? agreementUrl = freezed,Object? profession = freezed,Object? monthlyRent = null,Object? securityDeposit = null,Object? rentDueDay = freezed,Object? propertyId = freezed,Object? roomId = freezed,Object? bedId = freezed,Object? joiningDate = freezed,Object? moveOutDate = freezed,Object? expectedVacatingDate = freezed,Object? property = freezed,Object? autopayActive = null,Object? status = freezed,Object? notes = freezed,Object? room = freezed,Object? bed = freezed,Object? dues = null,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,firstName: null == firstName ? _self.firstName : firstName // ignore: cast_nullable_to_non_nullable
@@ -1241,7 +1241,11 @@ as int?,propertyId: freezed == propertyId ? _self.propertyId : propertyId // ign
 as String?,roomId: freezed == roomId ? _self.roomId : roomId // ignore: cast_nullable_to_non_nullable
 as String?,bedId: freezed == bedId ? _self.bedId : bedId // ignore: cast_nullable_to_non_nullable
 as String?,joiningDate: freezed == joiningDate ? _self.joiningDate : joiningDate // ignore: cast_nullable_to_non_nullable
-as String?,status: freezed == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
+as String?,moveOutDate: freezed == moveOutDate ? _self.moveOutDate : moveOutDate // ignore: cast_nullable_to_non_nullable
+as String?,expectedVacatingDate: freezed == expectedVacatingDate ? _self.expectedVacatingDate : expectedVacatingDate // ignore: cast_nullable_to_non_nullable
+as String?,property: freezed == property ? _self.property : property // ignore: cast_nullable_to_non_nullable
+as PropertySummary?,autopayActive: null == autopayActive ? _self.autopayActive : autopayActive // ignore: cast_nullable_to_non_nullable
+as bool,status: freezed == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
 as String?,notes: freezed == notes ? _self.notes : notes // ignore: cast_nullable_to_non_nullable
 as String?,room: freezed == room ? _self.room : room // ignore: cast_nullable_to_non_nullable
 as TenantRoomSummary?,bed: freezed == bed ? _self.bed : bed // ignore: cast_nullable_to_non_nullable
@@ -1250,6 +1254,18 @@ as int,
   ));
 }
 /// Create a copy of Resident
+/// with the given fields replaced by the non-null parameter values.
+@override
+@pragma('vm:prefer-inline')
+$PropertySummaryCopyWith<$Res>? get property {
+    if (_self.property == null) {
+    return null;
+  }
+
+  return $PropertySummaryCopyWith<$Res>(_self.property!, (value) {
+    return _then(_self.copyWith(property: value));
+  });
+}/// Create a copy of Resident
 /// with the given fields replaced by the non-null parameter values.
 @override
 @pragma('vm:prefer-inline')
@@ -1355,10 +1371,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String firstName,  String? lastName,  String mobile,  String? email,  String? whatsappNumber,  String? emergencyContact,  String? permanentAddress,  String? parentName,  String? parentPhone,  String? idProofUrl,  String? agreementUrl,  String? profession,  int monthlyRent,  int securityDeposit,  int? rentDueDay,  String? propertyId,  String? roomId,  String? bedId,  String? joiningDate,  String? status,  String? notes,  TenantRoomSummary? room,  TenantBedSummary? bed,  int dues)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String firstName,  String? lastName,  String mobile,  String? email,  String? whatsappNumber,  String? emergencyContact,  String? permanentAddress,  String? parentName,  String? parentPhone,  String? idProofUrl,  String? agreementUrl,  String? profession,  int monthlyRent,  int securityDeposit,  int? rentDueDay,  String? propertyId,  String? roomId,  String? bedId,  String? joiningDate,  String? moveOutDate,  String? expectedVacatingDate,  PropertySummary? property,  bool autopayActive,  String? status,  String? notes,  TenantRoomSummary? room,  TenantBedSummary? bed,  int dues)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _Resident() when $default != null:
-return $default(_that.id,_that.firstName,_that.lastName,_that.mobile,_that.email,_that.whatsappNumber,_that.emergencyContact,_that.permanentAddress,_that.parentName,_that.parentPhone,_that.idProofUrl,_that.agreementUrl,_that.profession,_that.monthlyRent,_that.securityDeposit,_that.rentDueDay,_that.propertyId,_that.roomId,_that.bedId,_that.joiningDate,_that.status,_that.notes,_that.room,_that.bed,_that.dues);case _:
+return $default(_that.id,_that.firstName,_that.lastName,_that.mobile,_that.email,_that.whatsappNumber,_that.emergencyContact,_that.permanentAddress,_that.parentName,_that.parentPhone,_that.idProofUrl,_that.agreementUrl,_that.profession,_that.monthlyRent,_that.securityDeposit,_that.rentDueDay,_that.propertyId,_that.roomId,_that.bedId,_that.joiningDate,_that.moveOutDate,_that.expectedVacatingDate,_that.property,_that.autopayActive,_that.status,_that.notes,_that.room,_that.bed,_that.dues);case _:
   return orElse();
 
 }
@@ -1376,10 +1392,10 @@ return $default(_that.id,_that.firstName,_that.lastName,_that.mobile,_that.email
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String firstName,  String? lastName,  String mobile,  String? email,  String? whatsappNumber,  String? emergencyContact,  String? permanentAddress,  String? parentName,  String? parentPhone,  String? idProofUrl,  String? agreementUrl,  String? profession,  int monthlyRent,  int securityDeposit,  int? rentDueDay,  String? propertyId,  String? roomId,  String? bedId,  String? joiningDate,  String? status,  String? notes,  TenantRoomSummary? room,  TenantBedSummary? bed,  int dues)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String firstName,  String? lastName,  String mobile,  String? email,  String? whatsappNumber,  String? emergencyContact,  String? permanentAddress,  String? parentName,  String? parentPhone,  String? idProofUrl,  String? agreementUrl,  String? profession,  int monthlyRent,  int securityDeposit,  int? rentDueDay,  String? propertyId,  String? roomId,  String? bedId,  String? joiningDate,  String? moveOutDate,  String? expectedVacatingDate,  PropertySummary? property,  bool autopayActive,  String? status,  String? notes,  TenantRoomSummary? room,  TenantBedSummary? bed,  int dues)  $default,) {final _that = this;
 switch (_that) {
 case _Resident():
-return $default(_that.id,_that.firstName,_that.lastName,_that.mobile,_that.email,_that.whatsappNumber,_that.emergencyContact,_that.permanentAddress,_that.parentName,_that.parentPhone,_that.idProofUrl,_that.agreementUrl,_that.profession,_that.monthlyRent,_that.securityDeposit,_that.rentDueDay,_that.propertyId,_that.roomId,_that.bedId,_that.joiningDate,_that.status,_that.notes,_that.room,_that.bed,_that.dues);case _:
+return $default(_that.id,_that.firstName,_that.lastName,_that.mobile,_that.email,_that.whatsappNumber,_that.emergencyContact,_that.permanentAddress,_that.parentName,_that.parentPhone,_that.idProofUrl,_that.agreementUrl,_that.profession,_that.monthlyRent,_that.securityDeposit,_that.rentDueDay,_that.propertyId,_that.roomId,_that.bedId,_that.joiningDate,_that.moveOutDate,_that.expectedVacatingDate,_that.property,_that.autopayActive,_that.status,_that.notes,_that.room,_that.bed,_that.dues);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -1396,10 +1412,10 @@ return $default(_that.id,_that.firstName,_that.lastName,_that.mobile,_that.email
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String firstName,  String? lastName,  String mobile,  String? email,  String? whatsappNumber,  String? emergencyContact,  String? permanentAddress,  String? parentName,  String? parentPhone,  String? idProofUrl,  String? agreementUrl,  String? profession,  int monthlyRent,  int securityDeposit,  int? rentDueDay,  String? propertyId,  String? roomId,  String? bedId,  String? joiningDate,  String? status,  String? notes,  TenantRoomSummary? room,  TenantBedSummary? bed,  int dues)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String firstName,  String? lastName,  String mobile,  String? email,  String? whatsappNumber,  String? emergencyContact,  String? permanentAddress,  String? parentName,  String? parentPhone,  String? idProofUrl,  String? agreementUrl,  String? profession,  int monthlyRent,  int securityDeposit,  int? rentDueDay,  String? propertyId,  String? roomId,  String? bedId,  String? joiningDate,  String? moveOutDate,  String? expectedVacatingDate,  PropertySummary? property,  bool autopayActive,  String? status,  String? notes,  TenantRoomSummary? room,  TenantBedSummary? bed,  int dues)?  $default,) {final _that = this;
 switch (_that) {
 case _Resident() when $default != null:
-return $default(_that.id,_that.firstName,_that.lastName,_that.mobile,_that.email,_that.whatsappNumber,_that.emergencyContact,_that.permanentAddress,_that.parentName,_that.parentPhone,_that.idProofUrl,_that.agreementUrl,_that.profession,_that.monthlyRent,_that.securityDeposit,_that.rentDueDay,_that.propertyId,_that.roomId,_that.bedId,_that.joiningDate,_that.status,_that.notes,_that.room,_that.bed,_that.dues);case _:
+return $default(_that.id,_that.firstName,_that.lastName,_that.mobile,_that.email,_that.whatsappNumber,_that.emergencyContact,_that.permanentAddress,_that.parentName,_that.parentPhone,_that.idProofUrl,_that.agreementUrl,_that.profession,_that.monthlyRent,_that.securityDeposit,_that.rentDueDay,_that.propertyId,_that.roomId,_that.bedId,_that.joiningDate,_that.moveOutDate,_that.expectedVacatingDate,_that.property,_that.autopayActive,_that.status,_that.notes,_that.room,_that.bed,_that.dues);case _:
   return null;
 
 }
@@ -1411,7 +1427,7 @@ return $default(_that.id,_that.firstName,_that.lastName,_that.mobile,_that.email
 @JsonSerializable()
 
 class _Resident implements Resident {
-  const _Resident({required this.id, required this.firstName, this.lastName, required this.mobile, this.email, this.whatsappNumber, this.emergencyContact, this.permanentAddress, this.parentName, this.parentPhone, this.idProofUrl, this.agreementUrl, this.profession, required this.monthlyRent, this.securityDeposit = 0, this.rentDueDay, this.propertyId, this.roomId, this.bedId, this.joiningDate, this.status, this.notes, this.room, this.bed, this.dues = 0});
+  const _Resident({required this.id, required this.firstName, this.lastName, required this.mobile, this.email, this.whatsappNumber, this.emergencyContact, this.permanentAddress, this.parentName, this.parentPhone, this.idProofUrl, this.agreementUrl, this.profession, required this.monthlyRent, this.securityDeposit = 0, this.rentDueDay, this.propertyId, this.roomId, this.bedId, this.joiningDate, this.moveOutDate, this.expectedVacatingDate, this.property, this.autopayActive = false, this.status, this.notes, this.room, this.bed, this.dues = 0});
   factory _Resident.fromJson(Map<String, dynamic> json) => _$ResidentFromJson(json);
 
 @override final  String id;
@@ -1434,6 +1450,10 @@ class _Resident implements Resident {
 @override final  String? roomId;
 @override final  String? bedId;
 @override final  String? joiningDate;
+@override final  String? moveOutDate;
+@override final  String? expectedVacatingDate;
+@override final  PropertySummary? property;
+@override@JsonKey() final  bool autopayActive;
 @override final  String? status;
 @override final  String? notes;
 @override final  TenantRoomSummary? room;
@@ -1453,16 +1473,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Resident&&(identical(other.id, id) || other.id == id)&&(identical(other.firstName, firstName) || other.firstName == firstName)&&(identical(other.lastName, lastName) || other.lastName == lastName)&&(identical(other.mobile, mobile) || other.mobile == mobile)&&(identical(other.email, email) || other.email == email)&&(identical(other.whatsappNumber, whatsappNumber) || other.whatsappNumber == whatsappNumber)&&(identical(other.emergencyContact, emergencyContact) || other.emergencyContact == emergencyContact)&&(identical(other.permanentAddress, permanentAddress) || other.permanentAddress == permanentAddress)&&(identical(other.parentName, parentName) || other.parentName == parentName)&&(identical(other.parentPhone, parentPhone) || other.parentPhone == parentPhone)&&(identical(other.idProofUrl, idProofUrl) || other.idProofUrl == idProofUrl)&&(identical(other.agreementUrl, agreementUrl) || other.agreementUrl == agreementUrl)&&(identical(other.profession, profession) || other.profession == profession)&&(identical(other.monthlyRent, monthlyRent) || other.monthlyRent == monthlyRent)&&(identical(other.securityDeposit, securityDeposit) || other.securityDeposit == securityDeposit)&&(identical(other.rentDueDay, rentDueDay) || other.rentDueDay == rentDueDay)&&(identical(other.propertyId, propertyId) || other.propertyId == propertyId)&&(identical(other.roomId, roomId) || other.roomId == roomId)&&(identical(other.bedId, bedId) || other.bedId == bedId)&&(identical(other.joiningDate, joiningDate) || other.joiningDate == joiningDate)&&(identical(other.status, status) || other.status == status)&&(identical(other.notes, notes) || other.notes == notes)&&(identical(other.room, room) || other.room == room)&&(identical(other.bed, bed) || other.bed == bed)&&(identical(other.dues, dues) || other.dues == dues));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Resident&&(identical(other.id, id) || other.id == id)&&(identical(other.firstName, firstName) || other.firstName == firstName)&&(identical(other.lastName, lastName) || other.lastName == lastName)&&(identical(other.mobile, mobile) || other.mobile == mobile)&&(identical(other.email, email) || other.email == email)&&(identical(other.whatsappNumber, whatsappNumber) || other.whatsappNumber == whatsappNumber)&&(identical(other.emergencyContact, emergencyContact) || other.emergencyContact == emergencyContact)&&(identical(other.permanentAddress, permanentAddress) || other.permanentAddress == permanentAddress)&&(identical(other.parentName, parentName) || other.parentName == parentName)&&(identical(other.parentPhone, parentPhone) || other.parentPhone == parentPhone)&&(identical(other.idProofUrl, idProofUrl) || other.idProofUrl == idProofUrl)&&(identical(other.agreementUrl, agreementUrl) || other.agreementUrl == agreementUrl)&&(identical(other.profession, profession) || other.profession == profession)&&(identical(other.monthlyRent, monthlyRent) || other.monthlyRent == monthlyRent)&&(identical(other.securityDeposit, securityDeposit) || other.securityDeposit == securityDeposit)&&(identical(other.rentDueDay, rentDueDay) || other.rentDueDay == rentDueDay)&&(identical(other.propertyId, propertyId) || other.propertyId == propertyId)&&(identical(other.roomId, roomId) || other.roomId == roomId)&&(identical(other.bedId, bedId) || other.bedId == bedId)&&(identical(other.joiningDate, joiningDate) || other.joiningDate == joiningDate)&&(identical(other.moveOutDate, moveOutDate) || other.moveOutDate == moveOutDate)&&(identical(other.expectedVacatingDate, expectedVacatingDate) || other.expectedVacatingDate == expectedVacatingDate)&&(identical(other.property, property) || other.property == property)&&(identical(other.autopayActive, autopayActive) || other.autopayActive == autopayActive)&&(identical(other.status, status) || other.status == status)&&(identical(other.notes, notes) || other.notes == notes)&&(identical(other.room, room) || other.room == room)&&(identical(other.bed, bed) || other.bed == bed)&&(identical(other.dues, dues) || other.dues == dues));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hashAll([runtimeType,id,firstName,lastName,mobile,email,whatsappNumber,emergencyContact,permanentAddress,parentName,parentPhone,idProofUrl,agreementUrl,profession,monthlyRent,securityDeposit,rentDueDay,propertyId,roomId,bedId,joiningDate,status,notes,room,bed,dues]);
+int get hashCode => Object.hashAll([runtimeType,id,firstName,lastName,mobile,email,whatsappNumber,emergencyContact,permanentAddress,parentName,parentPhone,idProofUrl,agreementUrl,profession,monthlyRent,securityDeposit,rentDueDay,propertyId,roomId,bedId,joiningDate,moveOutDate,expectedVacatingDate,property,autopayActive,status,notes,room,bed,dues]);
 
 @override
 String toString() {
-  return 'Resident(id: $id, firstName: $firstName, lastName: $lastName, mobile: $mobile, email: $email, whatsappNumber: $whatsappNumber, emergencyContact: $emergencyContact, permanentAddress: $permanentAddress, parentName: $parentName, parentPhone: $parentPhone, idProofUrl: $idProofUrl, agreementUrl: $agreementUrl, profession: $profession, monthlyRent: $monthlyRent, securityDeposit: $securityDeposit, rentDueDay: $rentDueDay, propertyId: $propertyId, roomId: $roomId, bedId: $bedId, joiningDate: $joiningDate, status: $status, notes: $notes, room: $room, bed: $bed, dues: $dues)';
+  return 'Resident(id: $id, firstName: $firstName, lastName: $lastName, mobile: $mobile, email: $email, whatsappNumber: $whatsappNumber, emergencyContact: $emergencyContact, permanentAddress: $permanentAddress, parentName: $parentName, parentPhone: $parentPhone, idProofUrl: $idProofUrl, agreementUrl: $agreementUrl, profession: $profession, monthlyRent: $monthlyRent, securityDeposit: $securityDeposit, rentDueDay: $rentDueDay, propertyId: $propertyId, roomId: $roomId, bedId: $bedId, joiningDate: $joiningDate, moveOutDate: $moveOutDate, expectedVacatingDate: $expectedVacatingDate, property: $property, autopayActive: $autopayActive, status: $status, notes: $notes, room: $room, bed: $bed, dues: $dues)';
 }
 
 
@@ -1473,11 +1493,11 @@ abstract mixin class _$ResidentCopyWith<$Res> implements $ResidentCopyWith<$Res>
   factory _$ResidentCopyWith(_Resident value, $Res Function(_Resident) _then) = __$ResidentCopyWithImpl;
 @override @useResult
 $Res call({
- String id, String firstName, String? lastName, String mobile, String? email, String? whatsappNumber, String? emergencyContact, String? permanentAddress, String? parentName, String? parentPhone, String? idProofUrl, String? agreementUrl, String? profession, int monthlyRent, int securityDeposit, int? rentDueDay, String? propertyId, String? roomId, String? bedId, String? joiningDate, String? status, String? notes, TenantRoomSummary? room, TenantBedSummary? bed, int dues
+ String id, String firstName, String? lastName, String mobile, String? email, String? whatsappNumber, String? emergencyContact, String? permanentAddress, String? parentName, String? parentPhone, String? idProofUrl, String? agreementUrl, String? profession, int monthlyRent, int securityDeposit, int? rentDueDay, String? propertyId, String? roomId, String? bedId, String? joiningDate, String? moveOutDate, String? expectedVacatingDate, PropertySummary? property, bool autopayActive, String? status, String? notes, TenantRoomSummary? room, TenantBedSummary? bed, int dues
 });
 
 
-@override $TenantRoomSummaryCopyWith<$Res>? get room;@override $TenantBedSummaryCopyWith<$Res>? get bed;
+@override $PropertySummaryCopyWith<$Res>? get property;@override $TenantRoomSummaryCopyWith<$Res>? get room;@override $TenantBedSummaryCopyWith<$Res>? get bed;
 
 }
 /// @nodoc
@@ -1490,7 +1510,7 @@ class __$ResidentCopyWithImpl<$Res>
 
 /// Create a copy of Resident
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? firstName = null,Object? lastName = freezed,Object? mobile = null,Object? email = freezed,Object? whatsappNumber = freezed,Object? emergencyContact = freezed,Object? permanentAddress = freezed,Object? parentName = freezed,Object? parentPhone = freezed,Object? idProofUrl = freezed,Object? agreementUrl = freezed,Object? profession = freezed,Object? monthlyRent = null,Object? securityDeposit = null,Object? rentDueDay = freezed,Object? propertyId = freezed,Object? roomId = freezed,Object? bedId = freezed,Object? joiningDate = freezed,Object? status = freezed,Object? notes = freezed,Object? room = freezed,Object? bed = freezed,Object? dues = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? firstName = null,Object? lastName = freezed,Object? mobile = null,Object? email = freezed,Object? whatsappNumber = freezed,Object? emergencyContact = freezed,Object? permanentAddress = freezed,Object? parentName = freezed,Object? parentPhone = freezed,Object? idProofUrl = freezed,Object? agreementUrl = freezed,Object? profession = freezed,Object? monthlyRent = null,Object? securityDeposit = null,Object? rentDueDay = freezed,Object? propertyId = freezed,Object? roomId = freezed,Object? bedId = freezed,Object? joiningDate = freezed,Object? moveOutDate = freezed,Object? expectedVacatingDate = freezed,Object? property = freezed,Object? autopayActive = null,Object? status = freezed,Object? notes = freezed,Object? room = freezed,Object? bed = freezed,Object? dues = null,}) {
   return _then(_Resident(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,firstName: null == firstName ? _self.firstName : firstName // ignore: cast_nullable_to_non_nullable
@@ -1512,7 +1532,11 @@ as int?,propertyId: freezed == propertyId ? _self.propertyId : propertyId // ign
 as String?,roomId: freezed == roomId ? _self.roomId : roomId // ignore: cast_nullable_to_non_nullable
 as String?,bedId: freezed == bedId ? _self.bedId : bedId // ignore: cast_nullable_to_non_nullable
 as String?,joiningDate: freezed == joiningDate ? _self.joiningDate : joiningDate // ignore: cast_nullable_to_non_nullable
-as String?,status: freezed == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
+as String?,moveOutDate: freezed == moveOutDate ? _self.moveOutDate : moveOutDate // ignore: cast_nullable_to_non_nullable
+as String?,expectedVacatingDate: freezed == expectedVacatingDate ? _self.expectedVacatingDate : expectedVacatingDate // ignore: cast_nullable_to_non_nullable
+as String?,property: freezed == property ? _self.property : property // ignore: cast_nullable_to_non_nullable
+as PropertySummary?,autopayActive: null == autopayActive ? _self.autopayActive : autopayActive // ignore: cast_nullable_to_non_nullable
+as bool,status: freezed == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
 as String?,notes: freezed == notes ? _self.notes : notes // ignore: cast_nullable_to_non_nullable
 as String?,room: freezed == room ? _self.room : room // ignore: cast_nullable_to_non_nullable
 as TenantRoomSummary?,bed: freezed == bed ? _self.bed : bed // ignore: cast_nullable_to_non_nullable
@@ -1522,6 +1546,18 @@ as int,
 }
 
 /// Create a copy of Resident
+/// with the given fields replaced by the non-null parameter values.
+@override
+@pragma('vm:prefer-inline')
+$PropertySummaryCopyWith<$Res>? get property {
+    if (_self.property == null) {
+    return null;
+  }
+
+  return $PropertySummaryCopyWith<$Res>(_self.property!, (value) {
+    return _then(_self.copyWith(property: value));
+  });
+}/// Create a copy of Resident
 /// with the given fields replaced by the non-null parameter values.
 @override
 @pragma('vm:prefer-inline')

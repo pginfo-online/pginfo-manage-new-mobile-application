@@ -17,6 +17,7 @@ class _TenantRepository extends PgRepository {
   @override
   Future<List<Property>> properties() async => [
     const Property(id: 'property-1', name: 'Vanaliika', type: 'PG'),
+    const Property(id: 'property-2', name: 'Sunshine', type: 'PG'),
   ];
   @override
   Future<List<Room>> rooms(
@@ -38,6 +39,36 @@ class _TenantRepository extends PgRepository {
 }
 
 void main() {
+  testWidgets('changing property on the form preserves the People filter', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final container = ProviderContainer(
+      overrides: [
+        repositoryProvider.overrideWith((ref) => _TenantRepository()),
+        selectedPropertyProvider.overrideWith(_SelectedProperty.new),
+      ],
+    );
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: AddTenantScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Vanaliika'));
+    await tester.tap(find.text('Vanaliika'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Sunshine').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Sunshine'), findsOneWidget);
+    expect(container.read(selectedPropertyProvider), 'property-1');
+  });
+
   testWidgets(
     'tenant form selects an available bed and shows payment details',
     (tester) async {

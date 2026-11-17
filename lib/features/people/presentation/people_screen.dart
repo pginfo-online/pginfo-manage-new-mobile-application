@@ -8,6 +8,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../app/di/providers.dart';
 import '../../../shared/components/common.dart';
 import '../../../shared/models/models.dart';
+import '../../tenants/presentation/tenant_actions.dart';
+import '../../tenants/presentation/tenant_skeleton.dart';
 
 class PeopleScreen extends ConsumerStatefulWidget {
   const PeopleScreen({super.key});
@@ -52,116 +54,263 @@ class _TenantsTab extends ConsumerStatefulWidget {
 
 class _TenantsState extends ConsumerState<_TenantsTab> {
   String search = '';
+  String? status;
   Timer? debounce;
+  bool selecting = false, busy = false;
+  final selected = <String>{};
+
   @override
   void dispose() {
     debounce?.cancel();
     super.dispose();
   }
 
+  Future<void> bulkMoveOut() async {
+    final archive = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Manage ${selected.length} tenants'),
+        content: const Text(
+          'Move tenants out to release their beds. Archive also hides their profiles from People and retains their history.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Move out'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Archive'),
+          ),
+        ],
+      ),
+    );
+    if (archive == null || !mounted) return;
+    setState(() => busy = true);
+    try {
+      await ref.read(operationsViewModelProvider).create(
+        '/residents/bulk-move-out',
+        {'residentIds': selected.toList(), 'archive': archive},
+      );
+      if (!mounted) return;
+      setState(() {
+        selected.clear();
+        selecting = false;
+      });
+      ref.invalidate(pagedListProvider);
+      ref.invalidate(roomsProvider);
+      ref.invalidate(dashboardProvider);
+    } catch (error) {
+      if (mounted) showError(context, error);
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  Future<void> more() async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            const ListTile(title: Text('More Actions')),
+            for (final (key, icon, title) in const [
+              ('add', Icons.person_add_alt_1, 'Add a Single Tenant'),
+              ('autopay', Icons.autorenew, 'Send Bulk Autopay Reminders'),
+              ('report', Icons.download, 'Download Tenant Report'),
+              (
+                'whatsapp',
+                Icons.chat_outlined,
+                'Send Bulk WhatsApp Payment Reminders',
+              ),
+              ('bulk', Icons.delete_outline, 'Bulk Eviction/Delete Tenants'),
+            ])
+              ListTile(
+                leading: Icon(icon),
+                trailing: const Icon(Icons.chevron_right),
+                title: Text(title),
+                onTap: () => Navigator.pop(context, key),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted) return;
+    switch (action) {
+      case 'add':
+        context.push('/tenants/new');
+      case 'autopay':
+        context.push('/action/reminders?kind=autopay');
+      case 'report':
+        final property = ref.read(selectedPropertyProvider);
+        context.push(
+          Uri(
+            path: '/action/report',
+            queryParameters: {'type': 'residents', 'propertyId': ?property},
+          ).toString(),
+        );
+      case 'whatsapp':
+        context.push('/action/reminders?kind=whatsapp');
+      case 'bulk':
+        setState(() => selecting = true);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final propertyId = ref.watch(selectedPropertyProvider);
+    ref.listen(selectedPropertyProvider, (_, _) {
+      setState(() {
+        selected.clear();
+        selecting = false;
+      });
+    });
     final query = PagedQuery(
       path: '/residents',
-      propertyId: ref.watch(selectedPropertyProvider),
+      propertyId: propertyId,
       search: search,
+      status: status,
     );
-    return Stack(
+    final provider = pagedListProvider(query);
+    return Column(
       children: [
-        RefreshIndicator(
-          onRefresh: () async {
-            ref.invalidate(pagedListProvider(query));
-            await ref.read(pagedListProvider(query).future);
-          },
-          child: ListView(
-            padding: const EdgeInsets.all(16),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 12, 8),
+          child: Row(
             children: [
-              SearchField(
-                hint: 'Search tenants',
-                onChanged: (v) {
-                  debounce?.cancel();
-                  debounce = Timer(
-                    const Duration(milliseconds: 350),
-                    () => mounted ? setState(() => search = v) : null,
-                  );
-                },
-              ),
-              const SizedBox(height: 12),
-              PgCard(
-                child: Row(
-                  children: [
-                    const Icon(Icons.task_alt),
-                    const SizedBox(width: 10),
-                    const Expanded(child: Text('Tasks pending')),
-                    TextButton(
-                      onPressed: () => context.push('/action/complaints'),
-                      child: const Text('View'),
-                    ),
-                  ],
+              Expanded(
+                child: SearchField(
+                  hint: 'Search tenants',
+                  onChanged: (value) {
+                    debounce?.cancel();
+                    debounce = Timer(const Duration(milliseconds: 300), () {
+                      if (mounted) setState(() => search = value.trim());
+                    });
+                  },
                 ),
               ),
-              Row(
-                children: [
-                  Expanded(
-                    child: MetricCard(
-                      label: 'View analytics dashboard',
-                      value: 'Insights',
-                      onTap: () => context.push('/analytics'),
-                    ),
+              PopupMenuButton<String>(
+                tooltip: 'Filter tenants',
+                icon: Icon(
+                  status == null ? Icons.filter_list : Icons.filter_alt,
+                ),
+                onSelected: (value) =>
+                    setState(() => status = value.isEmpty ? null : value),
+                itemBuilder: (_) => const [
+                  PopupMenuItem(value: '', child: Text('All tenants')),
+                  PopupMenuItem(value: 'ACTIVE', child: Text('Active')),
+                  PopupMenuItem(
+                    value: 'NOTICE_PERIOD',
+                    child: Text('On notice'),
                   ),
-                  Expanded(
-                    child: PgAsync(
-                      value: ref.watch(dashboardProvider),
-                      data: (data) => MetricCard(
-                        label: 'Total tenants',
-                        value:
-                            '${(data['operational'] as Map)['currentResidents']}',
-                        icon: Icons.people_outline,
-                      ),
-                    ),
+                  PopupMenuItem(
+                    value: 'PENDING_MOVE_IN',
+                    child: Text('Pending move-in'),
                   ),
+                  PopupMenuItem(value: 'MOVED_OUT', child: Text('Moved out')),
                 ],
               ),
-              const SizedBox(height: 12),
-              PgAsync(
-                value: ref.watch(pagedListProvider(query)),
-                retry: () => ref.invalidate(pagedListProvider(query)),
-                data: (items) {
-                  final visible = items.map(Resident.fromJson).toList();
-                  return Column(
-                    children: [
-                      for (final p in visible) _TenantCard(p),
-                      if (ref.read(pagedListProvider(query).notifier).hasMore)
-                        TextButton(
-                          onPressed: () async {
-                            try {
-                              await ref
-                                  .read(pagedListProvider(query).notifier)
-                                  .loadMore();
-                            } catch (e) {
-                              if (context.mounted) showError(context, e);
-                            }
-                          },
-                          child: const Text('Load more tenants'),
-                        ),
-                      if (visible.isEmpty)
-                        const Padding(
-                          padding: EdgeInsets.all(32),
-                          child: Text('No tenants found'),
-                        ),
-                    ],
-                  );
-                },
+              IconButton(
+                tooltip: 'More actions',
+                onPressed: busy ? null : more,
+                icon: const Icon(Icons.more_vert),
               ),
             ],
           ),
         ),
-        Positioned(
-          right: 16,
-          bottom: 16,
-          child: FloatingActionButton(
-            onPressed: () => context.push('/tenants/new'),
-            child: const Icon(Icons.add),
+        if (selecting)
+          ListTile(
+            title: Text('${selected.length} selected'),
+            leading: IconButton(
+              tooltip: 'Cancel selection',
+              onPressed: busy
+                  ? null
+                  : () => setState(() {
+                      selected.clear();
+                      selecting = false;
+                    }),
+              icon: const Icon(Icons.close),
+            ),
+            trailing: FilledButton(
+              onPressed: busy || selected.isEmpty ? null : bulkMoveOut,
+              child: Text(busy ? 'Saving…' : 'Continue'),
+            ),
+          ),
+        Expanded(
+          child: PgAsync(
+            value: ref.watch(provider),
+            placeholder: const SingleChildScrollView(
+              child: TenantSkeleton(TenantPlaceholder.cards),
+            ),
+            retry: () => ref.invalidate(provider),
+            data: (items) => RefreshIndicator(
+              onRefresh: () => ref.refresh(provider.future),
+              child: ListView.builder(
+                key: PageStorageKey(query),
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                itemCount: items.length + 1,
+                itemBuilder: (context, index) {
+                  if (index == items.length) {
+                    if (items.isEmpty) {
+                      return const Padding(
+                        padding: EdgeInsets.all(32),
+                        child: Center(child: Text('No tenants found')),
+                      );
+                    }
+                    if (!ref.read(provider.notifier).hasMore) {
+                      return const SizedBox.shrink();
+                    }
+                    return TextButton(
+                      onPressed: () async {
+                        try {
+                          await ref.read(provider.notifier).loadMore();
+                        } catch (error) {
+                          if (context.mounted) showError(context, error);
+                        }
+                      },
+                      child: const Text('Load more tenants'),
+                    );
+                  }
+                  final person = Resident.fromJson(items[index]);
+                  if (!selecting) {
+                    return _TenantCard(person, key: ValueKey(person.id));
+                  }
+                  return CheckboxListTile(
+                    key: ValueKey(person.id),
+                    value: selected.contains(person.id),
+                    title: Text(
+                      '${person.firstName} ${person.lastName ?? ''}'.trim(),
+                    ),
+                    subtitle: Text(person.property?.name ?? ''),
+                    onChanged: busy
+                        ? null
+                        : (value) {
+                            if (value == true && selected.length >= 50) {
+                              showError(
+                                context,
+                                'Select up to 50 tenants at a time',
+                              );
+                              return;
+                            }
+                            setState(() {
+                              if (value == true) {
+                                selected.add(person.id);
+                              } else {
+                                selected.remove(person.id);
+                              }
+                            });
+                          },
+                  );
+                },
+              ),
+            ),
           ),
         ),
       ],
@@ -170,58 +319,83 @@ class _TenantsState extends ConsumerState<_TenantsTab> {
 }
 
 class _TenantCard extends StatelessWidget {
-  const _TenantCard(this.person);
+  const _TenantCard(this.person, {super.key});
   final Resident person;
   @override
-  Widget build(BuildContext context) => PgCard(
-    onTap: () => context.push('/tenants/${person.id}'),
-    child: Column(
-      children: [
-        Row(
-          children: [
-            const CircleAvatar(child: Icon(Icons.person)),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+  Widget build(BuildContext context) => Column(
+    children: [
+      Padding(
+        padding: const EdgeInsets.all(8),
+        child: Text(
+          [
+            person.property?.name,
+            if (person.room != null) 'Room ${person.room!.roomNumber}',
+            if (person.bed != null) 'Bed ${person.bed!.bedNumber}',
+          ].nonNulls.join(' · '),
+        ),
+      ),
+      TenantQuickActions(
+        person: person,
+        child: PgCard(
+          onTap: () => context.push('/tenants/${person.id}'),
+          child: Column(
+            children: [
+              Row(
                 children: [
-                  Text(
-                    '${person.firstName} ${person.lastName ?? ''}',
-                    style: Theme.of(context).textTheme.titleMedium,
+                  const CircleAvatar(child: Icon(Icons.person)),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${person.firstName} ${person.lastName ?? ''}',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        Text('Rent: ${rupees(person.monthlyRent)}'),
+                      ],
+                    ),
                   ),
-                  Text('Rent: ${rupees(person.monthlyRent)}'),
+                  IconButton(
+                    tooltip: 'Call',
+                    onPressed: () =>
+                        launchUrl(Uri(scheme: 'tel', path: person.mobile)),
+                    icon: const Icon(Icons.call_outlined),
+                  ),
+                  IconButton(
+                    tooltip: 'WhatsApp',
+                    onPressed: () =>
+                        context.push('/action/message?residentId=${person.id}'),
+                    icon: const Icon(Icons.chat_outlined),
+                  ),
                 ],
               ),
-            ),
-            IconButton(
-              tooltip: 'Call',
-              onPressed: () =>
-                  launchUrl(Uri(scheme: 'tel', path: person.mobile)),
-              icon: const Icon(Icons.call_outlined),
-            ),
-            IconButton(
-              tooltip: 'WhatsApp',
-              onPressed: () =>
-                  context.push('/action/message?residentId=${person.id}'),
-              icon: const Icon(Icons.chat_outlined),
-            ),
-          ],
+              const Divider(),
+              Row(
+                children: [
+                  Text('Dues: ${rupees(person.dues)}'),
+                  const Spacer(),
+                  TextButton.icon(
+                    onPressed: () =>
+                        context.push('/action/due?residentId=${person.id}'),
+                    icon: const Icon(Icons.add),
+                    label: const Text('Due'),
+                  ),
+                ],
+              ),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  person.autopayActive
+                      ? '● Autopay active'
+                      : '○ Autopay inactive',
+                ),
+              ),
+            ],
+          ),
         ),
-        const Divider(),
-        Row(
-          children: [
-            Text('Dues: ${rupees(person.dues)}'),
-            const Spacer(),
-            TextButton.icon(
-              onPressed: () =>
-                  context.push('/action/due?residentId=${person.id}'),
-              icon: const Icon(Icons.add),
-              label: const Text('Add due'),
-            ),
-          ],
-        ),
-      ],
-    ),
+      ),
+    ],
   );
 }
 

@@ -12,6 +12,9 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../app/di/providers.dart';
 import '../../../shared/components/common.dart';
 import '../../../shared/models/models.dart';
+import '../../all/presentation/action_screen.dart';
+import 'tenant_actions.dart';
+import 'tenant_skeleton.dart';
 
 class TenantFormScreen extends ConsumerStatefulWidget {
   const TenantFormScreen({super.key});
@@ -304,24 +307,56 @@ class _DocumentPicker extends StatelessWidget {
 }
 
 class TenantDetailScreen extends ConsumerWidget {
-  const TenantDetailScreen({super.key, required this.id});
+  const TenantDetailScreen({super.key, required this.id, this.initialTab = 0});
   final String id;
+  final int initialTab;
+  void editProfile(BuildContext context) => showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    builder: (sheet) => FractionallySizedBox(
+      heightFactor: .94,
+      child: ActionScreen(
+        name: 'edit-tenant',
+        query: {'residentId': id},
+        onSaved: () => Navigator.of(sheet).pop(),
+      ),
+    ),
+  );
+
   @override
   Widget build(BuildContext context, WidgetRef ref) => PgAsync(
     value: ref.watch(residentProvider(id)),
+    placeholder: Scaffold(
+      appBar: AppBar(title: const Text('Tenant')),
+      body: const TenantSkeleton(TenantPlaceholder.document),
+    ),
     retry: () => ref.invalidate(residentProvider(id)),
     data: (person) => DefaultTabController(
       length: 4,
+      initialIndex: initialTab,
       child: Scaffold(
         appBar: AppBar(
-          title: Text('${person.firstName} ${person.lastName ?? ''}'),
+          title: Text(
+            '${person.firstName} ${person.lastName ?? ''} · ${tenantRoom(person)}',
+          ),
+          toolbarHeight: 72,
+          flexibleSpace: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.only(left: 56, top: 53),
+              child: Text(
+                person.property?.name ?? '',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ),
+          ),
           bottom: const TabBar(
             isScrollable: true,
             tabs: [
               Tab(text: 'Joining form'),
-              Tab(text: 'Profile'),
+              Tab(text: 'Profile Details'),
               Tab(text: 'Passbook'),
-              Tab(text: 'Activity'),
+              Tab(text: 'Activity Logs'),
             ],
           ),
         ),
@@ -331,59 +366,81 @@ class TenantDetailScreen extends ConsumerWidget {
             ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                PgCard(
-                  child: Column(
-                    children: [
-                      CircleAvatar(
-                        radius: 28,
-                        child: Text(person.firstName[0]),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '${person.firstName} ${person.lastName ?? ''}',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      Text(
-                        'Rent ${rupees(person.monthlyRent)} • Joined ${person.joiningDate?.substring(0, 10) ?? '—'}',
-                      ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          IconButton(
-                            tooltip: 'Call',
-                            onPressed: () => launchUrl(
-                              Uri(scheme: 'tel', path: person.mobile),
-                            ),
-                            icon: const Icon(Icons.call),
-                          ),
-                          IconButton(
-                            tooltip: 'WhatsApp',
-                            onPressed: () => context.push(
-                              '/action/message?residentId=${person.id}',
-                            ),
-                            icon: const Icon(Icons.chat),
-                          ),
-                          IconButton(
-                            tooltip: 'Edit',
-                            onPressed: () => context.push(
-                              '/action/edit-tenant?residentId=${person.id}',
-                            ),
-                            icon: const Icon(Icons.edit),
-                          ),
-                          IconButton(
-                            tooltip: 'Invite',
-                            onPressed: () => SharePlus.instance.share(
-                              ShareParams(
-                                text:
-                                    'Hi ${person.firstName}, access your PgInfo tenant account using mobile ${person.mobile}.',
-                                subject: 'PgInfo invitation',
+                TenantQuickActions(
+                  person: person,
+                  child: PgCard(
+                    child: Column(
+                      children: [
+                        CircleAvatar(
+                          radius: 28,
+                          child: Text(person.firstName[0]),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '${person.firstName} ${person.lastName ?? ''}',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        Text(tenantRoom(person)),
+                        Text(
+                          'Rent ${rupees(person.monthlyRent)}  ·  Deposit ${rupees(person.securityDeposit)}',
+                        ),
+                        Text(
+                          'DOJ ${shortDate(person.joiningDate)}  ·  DOL ${shortDate(person.moveOutDate ?? person.expectedVacatingDate)}',
+                        ),
+
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            IconButton(
+                              tooltip: 'Call',
+                              onPressed: () => launchUrl(
+                                Uri(scheme: 'tel', path: person.mobile),
                               ),
+                              icon: const Icon(Icons.call),
                             ),
-                            icon: const Icon(Icons.person_add_alt_1),
+                            IconButton(
+                              tooltip: 'WhatsApp',
+                              onPressed: () => context.push(
+                                '/action/message?residentId=${person.id}',
+                              ),
+                              icon: const Icon(Icons.chat),
+                            ),
+                            IconButton(
+                              tooltip: 'Edit',
+                              onPressed: () => editProfile(context),
+                              icon: const Icon(Icons.edit),
+                            ),
+                            IconButton(
+                              tooltip: 'Invite',
+                              onPressed: () => SharePlus.instance.share(
+                                ShareParams(
+                                  text:
+                                      'Hi ${person.firstName}, access your PgInfo tenant account using mobile ${person.mobile}.',
+                                  subject: 'PgInfo invitation',
+                                ),
+                              ),
+                              icon: const Icon(Icons.person_add_alt_1),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                PgCard(
+                  child: ListTile(
+                    leading: const Icon(Icons.autorenew),
+                    title: const Text('Autopay setup'),
+                    subtitle: Text(
+                      person.autopayActive ? 'Active' : 'Not set up',
+                    ),
+                    trailing: person.autopayActive
+                        ? null
+                        : TextButton(
+                            onPressed: () =>
+                                remindTenant(context, ref, id, kind: 'autopay'),
+                            child: const Text('Remind'),
                           ),
-                        ],
-                      ),
-                    ],
                   ),
                 ),
                 const _SectionTitle('Personal details'),
@@ -476,13 +533,12 @@ class TenantDetailScreen extends ConsumerWidget {
                         ),
                 ),
                 FilledButton(
-                  onPressed: () =>
-                      context.push('/action/due?residentId=${person.id}'),
-                  child: const Text('Add due'),
+                  onPressed: () => editProfile(context),
+                  child: const Text('Edit profile or upload documents'),
                 ),
               ],
             ),
-            _Passbook(id),
+            _Passbook(person),
             _Activity(entityType: 'Resident', entityId: id),
           ],
         ),
@@ -505,16 +561,28 @@ class _JoiningForm extends StatelessWidget {
   const _JoiningForm(this.person);
   final Resident person;
 
-  String get content =>
-      '''PgInfo tenant joining form
-
-Name: ${person.firstName} ${person.lastName ?? ''}
-Mobile: ${person.mobile}
-Joining date: ${person.joiningDate?.substring(0, 10) ?? '—'}
-Monthly rent: ${rupees(person.monthlyRent)}
-Room: ${person.roomId ?? 'Not allocated'}
-Status: ${person.status ?? '—'}
-Tenant reference: ${person.id}''';
+  Map<String, Map<String, String>> get sections => {
+    'Personal details': {
+      'Name': '${person.firstName} ${person.lastName ?? ''}'.trim(),
+      'Mobile': person.mobile,
+      'Email': person.email ?? '—',
+      'Address': person.permanentAddress ?? '—',
+      'Profession': person.profession ?? '—',
+      'Parent': person.parentName ?? '—',
+      'Parent phone': person.parentPhone ?? '—',
+      'Emergency contact': person.emergencyContact ?? '—',
+    },
+    'Stay and payment details': {
+      'Property': person.property?.name ?? '—',
+      'Allocation': tenantRoom(person),
+      'Joining date': shortDate(person.joiningDate),
+      'Expected move-out': shortDate(person.expectedVacatingDate),
+      'Monthly rent': rupees(person.monthlyRent),
+      'Security deposit': rupees(person.securityDeposit),
+      'Rent due day': '${person.rentDueDay ?? "Property default"}',
+      'Remarks': person.notes ?? '—',
+    },
+  };
 
   @override
   Widget build(BuildContext context) => ListView(
@@ -529,7 +597,12 @@ Tenant reference: ${person.id}''';
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const Divider(),
-            SelectableText(content),
+            Text(person.property?.name ?? ''),
+            for (final section in sections.entries) ...[
+              _SectionTitle(section.key),
+              for (final row in section.value.entries)
+                ListTile(title: Text(row.key), subtitle: Text(row.value)),
+            ],
           ],
         ),
       ),
@@ -537,14 +610,24 @@ Tenant reference: ${person.id}''';
         onPressed: () async {
           try {
             final document = pw.Document();
-            document.addPage(
-              pw.MultiPage(
-                build: (_) => [
-                  pw.Header(level: 0, text: 'PgInfo tenant joining form'),
-                  pw.Text(content.replaceAll('₹', 'INR ')),
-                ],
-              ),
-            );
+            for (final section in sections.entries) {
+              document.addPage(
+                pw.MultiPage(
+                  header: (_) => pw.Header(
+                    level: 0,
+                    text: person.property?.name ?? 'Tenant joining form',
+                  ),
+                  build: (_) => [
+                    pw.Header(level: 1, text: section.key),
+                    for (final row in section.value.entries)
+                      pw.Paragraph(
+                        text:
+                            '${row.key}: ${row.value.replaceAll('₹', 'INR ')}',
+                      ),
+                  ],
+                ),
+              );
+            }
             final directory = await getTemporaryDirectory();
             final file = File(
               '${directory.path}${Platform.pathSeparator}joining-form-${person.id}.pdf',
@@ -573,79 +656,491 @@ class _Activity extends ConsumerWidget {
   final String entityId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) => PgAsync(
-    value: ref.watch(
-      activityProvider((entityType: entityType, entityId: entityId)),
-    ),
-    data: (events) {
-      if (events.isEmpty) {
-        return const Center(child: Text('No activity recorded yet'));
-      }
-      return ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: events.length,
-        itemBuilder: (context, index) {
-          final event = events[index];
-          return PgCard(
-            child: ListTile(
-              leading: const Icon(Icons.history),
-              title: Text(
-                '${event['action']}'.replaceAll('.', ' ').toUpperCase(),
+  Widget build(BuildContext context, WidgetRef ref) {
+    final provider = pagedListProvider(
+      PagedQuery(
+        path: '/dashboard/activity',
+        entityType: entityType,
+        filterName: 'entityId',
+        filterValue: entityId,
+      ),
+    );
+    return PgAsync(
+      value: ref.watch(provider),
+      placeholder: const SingleChildScrollView(
+        child: TenantSkeleton(TenantPlaceholder.fields),
+      ),
+      retry: () => ref.invalidate(provider),
+      data: (events) {
+        if (events.isEmpty) {
+          return const Center(child: Text('No activity recorded yet'));
+        }
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: events.length + 1,
+          itemBuilder: (context, index) {
+            if (index == events.length) {
+              if (!ref.read(provider.notifier).hasMore) {
+                return const SizedBox.shrink();
+              }
+              return TextButton(
+                onPressed: () async {
+                  try {
+                    await ref.read(provider.notifier).loadMore();
+                  } catch (error) {
+                    if (context.mounted) showError(context, error);
+                  }
+                },
+                child: const Text('Load more activity'),
+              );
+            }
+            final event = events[index];
+            final metadata = event['metadata'];
+            final reason = metadata is Map ? metadata['reason'] : null;
+            final date = DateTime.tryParse('${event['createdAt']}')?.toLocal();
+            final local = MaterialLocalizations.of(context);
+            final description = [
+              if (date != null)
+                '${local.formatMediumDate(date)} · ${local.formatTimeOfDay(TimeOfDay.fromDateTime(date))}',
+              if (event['actor'] != null) '${event['actor']}',
+              if (reason != null) '$reason',
+            ].join('\n');
+            return PgCard(
+              child: ListTile(
+                leading: const Icon(Icons.history),
+                title: Text(
+                  '${event['action']}'.replaceAll(RegExp(r'[._]'), ' '),
+                ),
+                subtitle: Text(description),
               ),
-              subtitle: Text('${event['createdAt']}'),
-            ),
-          );
-        },
-      );
-    },
-  );
+            );
+          },
+        );
+      },
+    );
+  }
 }
 
-class _Passbook extends ConsumerWidget {
-  const _Passbook(this.id);
-  final String id;
+String shortDate(Object? value) {
+  final parsed = DateTime.tryParse(value?.toString() ?? '');
+  return parsed == null ? '—' : parsed.toIso8601String().substring(0, 10);
+}
+
+String tenantRoom(Resident person) => person.room == null
+    ? 'Unallocated'
+    : 'Room ${person.room!.roomNumber}${person.bed == null ? '' : ' · Bed ${person.bed!.bedNumber}'}';
+
+Future<void> remindTenant(
+  BuildContext context,
+  WidgetRef ref,
+  String id, {
+  String kind = 'rent',
+}) async {
+  try {
+    final result = await ref.read(operationsViewModelProvider).create(
+      '/announcements/reminders/rent',
+      {
+        'residentId': id,
+        'kind': kind,
+        'channel': kind == 'rent' ? 'WHATSAPP' : 'BOTH',
+      },
+    ) as Map;
+    if (context.mounted) {
+      final whatsapp = result['whatsapp'] as Map?;
+      final email = result['email'] as Map?;
+      final message = switch (result) {
+        {'missingMandates': final int missing} when missing > 0 =>
+          'Create an Autopay mandate before sending the WhatsApp invite.',
+        {'whatsappError': final String error} => error,
+        _ when whatsapp?['accepted'] == 1 => 'WhatsApp accepted the reminder',
+        _ when email?['accepted'] == 1 => 'Email accepted the reminder',
+        _ => 'No reminder was accepted',
+      };
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
+    }
+  } catch (error) {
+    if (context.mounted) showError(context, error);
+  }
+}
+
+enum _LedgerView {
+  ledger('Tenant Ledger'),
+  dues('Tenant Dues'),
+  collection('Total Collection'),
+  advance('Current Advance'),
+  deposit('Current Deposit'),
+  discount('Total Discount');
+
+  const _LedgerView(this.label);
+  final String label;
+}
+
+class _Passbook extends ConsumerStatefulWidget {
+  const _Passbook(this.person);
+  final Resident person;
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) => PgAsync(
+  ConsumerState<_Passbook> createState() => _PassbookState();
+}
+
+class _PassbookState extends ConsumerState<_Passbook> {
+  _LedgerView view = _LedgerView.dues;
+  String get id => widget.person.id;
+  bool reminding = false;
+
+  String recordPath({String? bill, required int amount}) =>
+      '/action/record?residentId=$id&amount=$amount${bill == null ? '' : '&billingRecordId=$bill'}';
+
+  int amount(Map<String, dynamic> row, String field) =>
+      (row[field] as num?)?.toInt() ?? 0;
+
+  int remaining(Map<String, dynamic> row) =>
+      amount(row, 'amount') - amount(row, 'paidAmount');
+
+  Future<void> editEntry({List<Map<String, dynamic>>? dues}) async {
+    final saved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => _PassbookEntry(person: widget.person, dues: dues),
+      ),
+    );
+    if (saved != true || !mounted) return;
+    ref.invalidate(tenantLedgerProvider(id));
+    ref.invalidate(residentProvider(id));
+    ref.invalidate(pagedListProvider);
+    ref.invalidate(dashboardProvider);
+    ref.invalidate(activityProvider((entityType: 'Resident', entityId: id)));
+  }
+
+  @override
+  Widget build(BuildContext context) => PgAsync(
     value: ref.watch(tenantLedgerProvider(id)),
+    placeholder: const SingleChildScrollView(
+      child: TenantSkeleton(TenantPlaceholder.ledger),
+    ),
     retry: () => ref.invalidate(tenantLedgerProvider(id)),
     data: (ledger) {
-      final dues = ledger['dues'] ?? [], payments = ledger['payments'] ?? [];
-      final outstanding = dues.fold<int>(
+      final charges = ledger['dues'] ?? [];
+      final payments = (ledger['payments'] ?? [])
+          .where((row) => row['status'] == 'CONFIRMED')
+          .toList();
+      final validCharges = charges
+          .where((row) => row['status'] != 'CANCELLED')
+          .toList();
+      final dues = validCharges.where((row) => remaining(row) > 0).toList();
+      final outstanding = dues.fold(0, (sum, row) => sum + remaining(row));
+      final collected = payments.fold(
         0,
-        (sum, e) =>
-            sum +
-            ((e['amount'] as num).toInt() - (e['paidAmount'] as num).toInt()),
+        (sum, row) => sum + amount(row, 'amount'),
       );
-      return ListView(
-        padding: const EdgeInsets.all(16),
+      final allocated = validCharges.fold(
+        0,
+        (sum, row) => sum + amount(row, 'paidAmount'),
+      );
+      final advance = (collected - allocated).clamp(0, collected);
+      final deposits = validCharges
+          .where((row) => row['type'] == 'SECURITY_DEPOSIT')
+          .toList();
+      final deposit = deposits.fold(
+        0,
+        (sum, row) => sum + amount(row, 'paidAmount'),
+      );
+      final discounts = validCharges
+          .where((row) => amount(row, 'discountAmount') > 0)
+          .toList();
+      final discounted = discounts.fold(
+        0,
+        (sum, row) => sum + amount(row, 'discountAmount'),
+      );
+      final values = {
+        _LedgerView.ledger: '${charges.length + payments.length} entries',
+        _LedgerView.dues: rupees(outstanding),
+        _LedgerView.collection: rupees(collected),
+        _LedgerView.advance: rupees(advance),
+        _LedgerView.deposit: rupees(deposit),
+        _LedgerView.discount: rupees(discounted),
+      };
+      final rows = switch (view) {
+        _LedgerView.ledger => [
+          ...charges,
+          ...payments,
+        ]..sort((a, b) => '${b['createdAt']}'.compareTo('${a['createdAt']}')),
+        _LedgerView.dues => dues,
+        _LedgerView.collection => payments,
+        _LedgerView.advance => <Map<String, dynamic>>[],
+        _LedgerView.deposit => deposits,
+        _LedgerView.discount => discounts,
+      };
+      return Column(
         children: [
-          MetricCard(label: 'Outstanding dues', value: rupees(outstanding)),
-          const SizedBox(height: 16),
-          Text('Charges', style: Theme.of(context).textTheme.titleMedium),
-          for (final due in dues)
-            PgCard(
-              child: ListTile(
-                title: Text('${due['type']} • ${rupees(due['amount'] as num)}'),
-                subtitle: Text('${due['status']} • Due ${due['dueDate']}'),
+          SizedBox(
+            height: 86,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              children: [
+                for (final item in _LedgerView.values)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: ChoiceChip(
+                      selected: item == view,
+                      onSelected: (_) => setState(() => view = item),
+                      label: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [Text(values[item]!), Text(item.label)],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView.builder(
+              key: ValueKey(view),
+              itemCount: rows.isEmpty ? 1 : rows.length,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemBuilder: (context, index) {
+                if (rows.isEmpty) {
+                  return ListTile(
+                    title: Text(
+                      view == _LedgerView.advance
+                          ? rupees(advance)
+                          : 'No entries',
+                    ),
+                    subtitle: view == _LedgerView.advance
+                        ? const Text(
+                            'Confirmed collections minus amounts applied to charges.',
+                          )
+                        : null,
+                  );
+                }
+                final row = rows[index];
+                final payment = row.containsKey('collectionDate');
+                final rent = row['type'] == 'RENT';
+                final date = DateTime.tryParse('${row['dueDate']}');
+                final title = payment
+                    ? 'Payment · ${row['mode']}'
+                    : rent && date != null
+                    ? '${MaterialLocalizations.of(context).formatMonthYear(date)} rent'
+                    : (row['description'] as String?)?.trim().isNotEmpty == true
+                    ? row['description'] as String
+                    : '${row['type']}'.replaceAll('_', ' ');
+                final displayAmount = switch (view) {
+                  _LedgerView.dues => remaining(row),
+                  _LedgerView.discount => amount(row, 'discountAmount'),
+                  _LedgerView.deposit => amount(row, 'paidAmount'),
+                  _ => amount(row, 'amount'),
+                };
+                return PgCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(title),
+                        subtitle: Text(
+                          payment
+                              ? shortDate(row['collectionDate'])
+                              : '${row['status']} · Due ${shortDate(row['dueDate'])}${row['addedBy'] == null ? '' : '\nAdded by ${row['addedBy']}'}',
+                        ),
+                        trailing: Text(rupees(displayAmount)),
+                        onTap: payment
+                            ? () => context.push(
+                                '/action/receipt?id=${row['id']}',
+                              )
+                            : null,
+                      ),
+                      if (payment)
+                        TextButton.icon(
+                          onPressed: () =>
+                              context.push('/action/receipt?id=${row['id']}'),
+                          icon: const Icon(Icons.receipt_long),
+                          label: const Text('View or share receipt'),
+                        ),
+                      if (view == _LedgerView.dues)
+                        Wrap(
+                          alignment: WrapAlignment.spaceBetween,
+                          children: [
+                            TextButton(
+                              onPressed: () => context.push(
+                                recordPath(
+                                  bill: '${row['id']}',
+                                  amount: remaining(row),
+                                ),
+                              ),
+                              child: const Text('Record Now'),
+                            ),
+                            OutlinedButton(
+                              onPressed: reminding
+                                  ? null
+                                  : () async {
+                                      setState(() => reminding = true);
+                                      await remindTenant(context, ref, id);
+                                      if (mounted) {
+                                        setState(() => reminding = false);
+                                      }
+                                    },
+                              child: const Text('Remind to Pay'),
+                            ),
+                          ],
+                        ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+          Material(
+            color: Theme.of(context).colorScheme.primaryContainer,
+            child: SafeArea(
+              top: false,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  TextButton(
+                    onPressed: () => context.push('/action/due?residentId=$id'),
+                    child: const Text('Add Dues'),
+                  ),
+                  TextButton(
+                    onPressed: outstanding == 0
+                        ? null
+                        : () => context.push(recordPath(amount: outstanding)),
+                    child: const Text('Record All'),
+                  ),
+                  TextButton(
+                    onPressed: dues.isEmpty
+                        ? null
+                        : () => editEntry(dues: dues),
+                    child: const Text('Give Discount'),
+                  ),
+                  PopupMenuButton<String>(
+                    tooltip: 'More passbook actions',
+                    onSelected: (value) => value == 'fine'
+                        ? context.push(
+                            '/action/due?residentId=$id&type=LATE_FEE',
+                          )
+                        : editEntry(),
+                    itemBuilder: (_) => const [
+                      PopupMenuItem(
+                        value: 'fine',
+                        child: Text('Add Late Fine'),
+                      ),
+                      PopupMenuItem(
+                        value: 'remarks',
+                        child: Text('Add Remarks'),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
-          const SizedBox(height: 16),
-          Text('Payments', style: Theme.of(context).textTheme.titleMedium),
-          for (final payment in payments)
-            PgCard(
-              child: ListTile(
-                title: Text(rupees(payment['amount'] as num)),
-                subtitle: Text('${payment['mode']} • ${payment['status']}'),
-                onTap: () =>
-                    context.push('/action/receipt?id=${payment['id']}'),
-              ),
-            ),
-          FilledButton(
-            onPressed: () => context.push('/action/record?residentId=$id'),
-            child: const Text('Record payment'),
           ),
         ],
       );
     },
   );
+}
+
+class _PassbookEntry extends ConsumerStatefulWidget {
+  const _PassbookEntry({required this.person, this.dues});
+  final Resident person;
+  final List<Map<String, dynamic>>? dues;
+
+  @override
+  ConsumerState<_PassbookEntry> createState() => _PassbookEntryState();
+}
+
+class _PassbookEntryState extends ConsumerState<_PassbookEntry> {
+  late final remarks = TextEditingController(
+    text: widget.dues == null ? widget.person.notes : null,
+  );
+  final amount = TextEditingController();
+  late String? bill = widget.dues?.firstOrNull?['id'] as String?;
+  bool busy = false;
+
+  @override
+  void dispose() {
+    remarks.dispose();
+    amount.dispose();
+    super.dispose();
+  }
+
+  Future<void> save() async {
+    final note = remarks.text.trim();
+    final discount = tryParseRupees(amount.text);
+    if (widget.dues != null &&
+        (bill == null || discount == null || discount <= 0 || note.isEmpty)) {
+      showError(context, 'Enter a positive amount and a reason');
+      return;
+    }
+    setState(() => busy = true);
+    try {
+      final repo = ref.read(operationsViewModelProvider);
+      if (widget.dues == null) {
+        await repo.updateResident(widget.person.id, {'notes': note});
+      } else {
+        await repo.create('/billing/records/$bill/discount', {
+          'amount': discount,
+          'reason': note,
+        });
+      }
+      if (mounted) Navigator.pop(context, true);
+    } catch (error) {
+      if (mounted) showError(context, error);
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dues = widget.dues;
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(dues == null ? 'Tenant remarks' : 'Give Discount'),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          if (dues != null) ...[
+            DropdownButtonFormField<String>(
+              initialValue: bill,
+              isExpanded: true,
+              decoration: const InputDecoration(labelText: 'Charge'),
+              items: [
+                for (final due in dues)
+                  DropdownMenuItem(
+                    value: due['id'] as String,
+                    child: Text(
+                      '${due['type']} · ${shortDate(due['dueDate'])} · ${rupees((due['amount'] as num) - (due['paidAmount'] as num))}',
+                    ),
+                  ),
+              ],
+              onChanged: (value) => setState(() => bill = value),
+            ),
+            const SizedBox(height: 12),
+            PgField(
+              'Discount amount (₹)',
+              controller: amount,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+          PgField(
+            dues == null ? 'Remarks' : 'Reason',
+            controller: remarks,
+            maxLines: 4,
+          ),
+          const SizedBox(height: 12),
+          FilledButton(
+            onPressed: busy ? null : save,
+            child: Text(busy ? 'Saving…' : 'Save'),
+          ),
+        ],
+      ),
+    );
+  }
 }
