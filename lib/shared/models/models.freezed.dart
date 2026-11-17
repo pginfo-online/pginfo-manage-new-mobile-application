@@ -290,7 +290,7 @@ as int,
 /// @nodoc
 mixin _$Room {
 
- String get id; String get roomNumber; String get floor; String get sharingType; int get rentAmount; String get status; String get gender; String get unitType; bool get isDisabledForRent; bool get isPublished; String? get availableFrom; PropertySummary? get property; List<Bed> get beds; List<String> get images; List<String> get amenities; String? get description; String? get remarks;
+ String get id; String get roomNumber; String get floor; String get sharingType; int get rentAmount; String get status; String get gender; String get unitType; int? get dailyStayMinPaise; int? get dailyStayMaxPaise; int? get areaSqft; bool get isDisabledForRent; bool get isPublished; String? get availableFrom; PropertySummary? get property; List<Bed> get beds; List<String> get images; List<String> get amenities; String? get description; String? get remarks;
 /// Create a copy of Room
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -303,16 +303,16 @@ $RoomCopyWith<Room> get copyWith => _$RoomCopyWithImpl<Room>(this as Room, _$ide
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is Room&&(identical(other.id, id) || other.id == id)&&(identical(other.roomNumber, roomNumber) || other.roomNumber == roomNumber)&&(identical(other.floor, floor) || other.floor == floor)&&(identical(other.sharingType, sharingType) || other.sharingType == sharingType)&&(identical(other.rentAmount, rentAmount) || other.rentAmount == rentAmount)&&(identical(other.status, status) || other.status == status)&&(identical(other.gender, gender) || other.gender == gender)&&(identical(other.unitType, unitType) || other.unitType == unitType)&&(identical(other.isDisabledForRent, isDisabledForRent) || other.isDisabledForRent == isDisabledForRent)&&(identical(other.isPublished, isPublished) || other.isPublished == isPublished)&&(identical(other.availableFrom, availableFrom) || other.availableFrom == availableFrom)&&(identical(other.property, property) || other.property == property)&&const DeepCollectionEquality().equals(other.beds, beds)&&const DeepCollectionEquality().equals(other.images, images)&&const DeepCollectionEquality().equals(other.amenities, amenities)&&(identical(other.description, description) || other.description == description)&&(identical(other.remarks, remarks) || other.remarks == remarks));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is Room&&(identical(other.id, id) || other.id == id)&&(identical(other.roomNumber, roomNumber) || other.roomNumber == roomNumber)&&(identical(other.floor, floor) || other.floor == floor)&&(identical(other.sharingType, sharingType) || other.sharingType == sharingType)&&(identical(other.rentAmount, rentAmount) || other.rentAmount == rentAmount)&&(identical(other.status, status) || other.status == status)&&(identical(other.gender, gender) || other.gender == gender)&&(identical(other.unitType, unitType) || other.unitType == unitType)&&(identical(other.dailyStayMinPaise, dailyStayMinPaise) || other.dailyStayMinPaise == dailyStayMinPaise)&&(identical(other.dailyStayMaxPaise, dailyStayMaxPaise) || other.dailyStayMaxPaise == dailyStayMaxPaise)&&(identical(other.areaSqft, areaSqft) || other.areaSqft == areaSqft)&&(identical(other.isDisabledForRent, isDisabledForRent) || other.isDisabledForRent == isDisabledForRent)&&(identical(other.isPublished, isPublished) || other.isPublished == isPublished)&&(identical(other.availableFrom, availableFrom) || other.availableFrom == availableFrom)&&(identical(other.property, property) || other.property == property)&&const DeepCollectionEquality().equals(other.beds, beds)&&const DeepCollectionEquality().equals(other.images, images)&&const DeepCollectionEquality().equals(other.amenities, amenities)&&(identical(other.description, description) || other.description == description)&&(identical(other.remarks, remarks) || other.remarks == remarks));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,roomNumber,floor,sharingType,rentAmount,status,gender,unitType,isDisabledForRent,isPublished,availableFrom,property,const DeepCollectionEquality().hash(beds),const DeepCollectionEquality().hash(images),const DeepCollectionEquality().hash(amenities),description,remarks);
+int get hashCode => Object.hashAll([runtimeType,id,roomNumber,floor,sharingType,rentAmount,status,gender,unitType,dailyStayMinPaise,dailyStayMaxPaise,areaSqft,isDisabledForRent,isPublished,availableFrom,property,const DeepCollectionEquality().hash(beds),const DeepCollectionEquality().hash(images),const DeepCollectionEquality().hash(amenities),description,remarks]);
 
 @override
 String toString() {
-  return 'Room(id: $id, roomNumber: $roomNumber, floor: $floor, sharingType: $sharingType, rentAmount: $rentAmount, status: $status, gender: $gender, unitType: $unitType, isDisabledForRent: $isDisabledForRent, isPublished: $isPublished, availableFrom: $availableFrom, property: $property, beds: $beds, images: $images, amenities: $amenities, description: $description, remarks: $remarks)';
+  return 'Room(id: $id, roomNumber: $roomNumber, floor: $floor, sharingType: $sharingType, rentAmount: $rentAmount, status: $status, gender: $gender, unitType: $unitType, dailyStayMinPaise: $dailyStayMinPaise, dailyStayMaxPaise: $dailyStayMaxPaise, areaSqft: $areaSqft, isDisabledForRent: $isDisabledForRent, isPublished: $isPublished, availableFrom: $availableFrom, property: $property, beds: $beds, images: $images, amenities: $amenities, description: $description, remarks: $remarks)';
 }
 
 
@@ -323,7 +323,7 @@ abstract mixin class $RoomCopyWith<$Res>  {
   factory $RoomCopyWith(Room value, $Res Function(Room) _then) = _$RoomCopyWithImpl;
 @useResult
 $Res call({
- String id, String roomNumber, String floor, String sharingType, int rentAmount, String status, String gender, String unitType, bool isDisabledForRent, bool isPublished, String? availableFrom, PropertySummary? property, List<Bed> beds, List<String> images, List<String> amenities, String? description, String? remarks
+ String id, String roomNumber, String floor, String sharingType, int rentAmount, String status, String gender, String unitType, int? dailyStayMinPaise, int? dailyStayMaxPaise, int? areaSqft, bool isDisabledForRent, bool isPublished, String? availableFrom, PropertySummary? property, List<Bed> beds, List<String> images, List<String> amenities, String? description, String? remarks
 });
 
 
@@ -340,7 +340,7 @@ class _$RoomCopyWithImpl<$Res>
 
 /// Create a copy of Room
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? roomNumber = null,Object? floor = null,Object? sharingType = null,Object? rentAmount = null,Object? status = null,Object? gender = null,Object? unitType = null,Object? isDisabledForRent = null,Object? isPublished = null,Object? availableFrom = freezed,Object? property = freezed,Object? beds = null,Object? images = null,Object? amenities = null,Object? description = freezed,Object? remarks = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? roomNumber = null,Object? floor = null,Object? sharingType = null,Object? rentAmount = null,Object? status = null,Object? gender = null,Object? unitType = null,Object? dailyStayMinPaise = freezed,Object? dailyStayMaxPaise = freezed,Object? areaSqft = freezed,Object? isDisabledForRent = null,Object? isPublished = null,Object? availableFrom = freezed,Object? property = freezed,Object? beds = null,Object? images = null,Object? amenities = null,Object? description = freezed,Object? remarks = freezed,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,roomNumber: null == roomNumber ? _self.roomNumber : roomNumber // ignore: cast_nullable_to_non_nullable
@@ -350,7 +350,10 @@ as String,rentAmount: null == rentAmount ? _self.rentAmount : rentAmount // igno
 as int,status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
 as String,gender: null == gender ? _self.gender : gender // ignore: cast_nullable_to_non_nullable
 as String,unitType: null == unitType ? _self.unitType : unitType // ignore: cast_nullable_to_non_nullable
-as String,isDisabledForRent: null == isDisabledForRent ? _self.isDisabledForRent : isDisabledForRent // ignore: cast_nullable_to_non_nullable
+as String,dailyStayMinPaise: freezed == dailyStayMinPaise ? _self.dailyStayMinPaise : dailyStayMinPaise // ignore: cast_nullable_to_non_nullable
+as int?,dailyStayMaxPaise: freezed == dailyStayMaxPaise ? _self.dailyStayMaxPaise : dailyStayMaxPaise // ignore: cast_nullable_to_non_nullable
+as int?,areaSqft: freezed == areaSqft ? _self.areaSqft : areaSqft // ignore: cast_nullable_to_non_nullable
+as int?,isDisabledForRent: null == isDisabledForRent ? _self.isDisabledForRent : isDisabledForRent // ignore: cast_nullable_to_non_nullable
 as bool,isPublished: null == isPublished ? _self.isPublished : isPublished // ignore: cast_nullable_to_non_nullable
 as bool,availableFrom: freezed == availableFrom ? _self.availableFrom : availableFrom // ignore: cast_nullable_to_non_nullable
 as String?,property: freezed == property ? _self.property : property // ignore: cast_nullable_to_non_nullable
@@ -456,10 +459,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String roomNumber,  String floor,  String sharingType,  int rentAmount,  String status,  String gender,  String unitType,  bool isDisabledForRent,  bool isPublished,  String? availableFrom,  PropertySummary? property,  List<Bed> beds,  List<String> images,  List<String> amenities,  String? description,  String? remarks)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String roomNumber,  String floor,  String sharingType,  int rentAmount,  String status,  String gender,  String unitType,  int? dailyStayMinPaise,  int? dailyStayMaxPaise,  int? areaSqft,  bool isDisabledForRent,  bool isPublished,  String? availableFrom,  PropertySummary? property,  List<Bed> beds,  List<String> images,  List<String> amenities,  String? description,  String? remarks)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _Room() when $default != null:
-return $default(_that.id,_that.roomNumber,_that.floor,_that.sharingType,_that.rentAmount,_that.status,_that.gender,_that.unitType,_that.isDisabledForRent,_that.isPublished,_that.availableFrom,_that.property,_that.beds,_that.images,_that.amenities,_that.description,_that.remarks);case _:
+return $default(_that.id,_that.roomNumber,_that.floor,_that.sharingType,_that.rentAmount,_that.status,_that.gender,_that.unitType,_that.dailyStayMinPaise,_that.dailyStayMaxPaise,_that.areaSqft,_that.isDisabledForRent,_that.isPublished,_that.availableFrom,_that.property,_that.beds,_that.images,_that.amenities,_that.description,_that.remarks);case _:
   return orElse();
 
 }
@@ -477,10 +480,10 @@ return $default(_that.id,_that.roomNumber,_that.floor,_that.sharingType,_that.re
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String roomNumber,  String floor,  String sharingType,  int rentAmount,  String status,  String gender,  String unitType,  bool isDisabledForRent,  bool isPublished,  String? availableFrom,  PropertySummary? property,  List<Bed> beds,  List<String> images,  List<String> amenities,  String? description,  String? remarks)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String roomNumber,  String floor,  String sharingType,  int rentAmount,  String status,  String gender,  String unitType,  int? dailyStayMinPaise,  int? dailyStayMaxPaise,  int? areaSqft,  bool isDisabledForRent,  bool isPublished,  String? availableFrom,  PropertySummary? property,  List<Bed> beds,  List<String> images,  List<String> amenities,  String? description,  String? remarks)  $default,) {final _that = this;
 switch (_that) {
 case _Room():
-return $default(_that.id,_that.roomNumber,_that.floor,_that.sharingType,_that.rentAmount,_that.status,_that.gender,_that.unitType,_that.isDisabledForRent,_that.isPublished,_that.availableFrom,_that.property,_that.beds,_that.images,_that.amenities,_that.description,_that.remarks);case _:
+return $default(_that.id,_that.roomNumber,_that.floor,_that.sharingType,_that.rentAmount,_that.status,_that.gender,_that.unitType,_that.dailyStayMinPaise,_that.dailyStayMaxPaise,_that.areaSqft,_that.isDisabledForRent,_that.isPublished,_that.availableFrom,_that.property,_that.beds,_that.images,_that.amenities,_that.description,_that.remarks);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -497,10 +500,10 @@ return $default(_that.id,_that.roomNumber,_that.floor,_that.sharingType,_that.re
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String roomNumber,  String floor,  String sharingType,  int rentAmount,  String status,  String gender,  String unitType,  bool isDisabledForRent,  bool isPublished,  String? availableFrom,  PropertySummary? property,  List<Bed> beds,  List<String> images,  List<String> amenities,  String? description,  String? remarks)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String roomNumber,  String floor,  String sharingType,  int rentAmount,  String status,  String gender,  String unitType,  int? dailyStayMinPaise,  int? dailyStayMaxPaise,  int? areaSqft,  bool isDisabledForRent,  bool isPublished,  String? availableFrom,  PropertySummary? property,  List<Bed> beds,  List<String> images,  List<String> amenities,  String? description,  String? remarks)?  $default,) {final _that = this;
 switch (_that) {
 case _Room() when $default != null:
-return $default(_that.id,_that.roomNumber,_that.floor,_that.sharingType,_that.rentAmount,_that.status,_that.gender,_that.unitType,_that.isDisabledForRent,_that.isPublished,_that.availableFrom,_that.property,_that.beds,_that.images,_that.amenities,_that.description,_that.remarks);case _:
+return $default(_that.id,_that.roomNumber,_that.floor,_that.sharingType,_that.rentAmount,_that.status,_that.gender,_that.unitType,_that.dailyStayMinPaise,_that.dailyStayMaxPaise,_that.areaSqft,_that.isDisabledForRent,_that.isPublished,_that.availableFrom,_that.property,_that.beds,_that.images,_that.amenities,_that.description,_that.remarks);case _:
   return null;
 
 }
@@ -512,7 +515,7 @@ return $default(_that.id,_that.roomNumber,_that.floor,_that.sharingType,_that.re
 @JsonSerializable()
 
 class _Room implements Room {
-  const _Room({required this.id, required this.roomNumber, this.floor = '0', required this.sharingType, required this.rentAmount, required this.status, this.gender = 'UNISEX', this.unitType = 'Room', this.isDisabledForRent = false, this.isPublished = true, this.availableFrom, this.property, this.beds = const [], this.images = const [], this.amenities = const [], this.description, this.remarks});
+  const _Room({required this.id, required this.roomNumber, this.floor = '0', required this.sharingType, required this.rentAmount, required this.status, this.gender = 'UNISEX', this.unitType = 'Room', this.dailyStayMinPaise, this.dailyStayMaxPaise, this.areaSqft, this.isDisabledForRent = false, this.isPublished = true, this.availableFrom, this.property, this.beds = const [], this.images = const [], this.amenities = const [], this.description, this.remarks});
   factory _Room.fromJson(Map<String, dynamic> json) => _$RoomFromJson(json);
 
 @override final  String id;
@@ -523,6 +526,9 @@ class _Room implements Room {
 @override final  String status;
 @override@JsonKey() final  String gender;
 @override@JsonKey() final  String unitType;
+@override final  int? dailyStayMinPaise;
+@override final  int? dailyStayMaxPaise;
+@override final  int? areaSqft;
 @override@JsonKey() final  bool isDisabledForRent;
 @override@JsonKey() final  bool isPublished;
 @override final  String? availableFrom;
@@ -546,16 +552,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Room&&(identical(other.id, id) || other.id == id)&&(identical(other.roomNumber, roomNumber) || other.roomNumber == roomNumber)&&(identical(other.floor, floor) || other.floor == floor)&&(identical(other.sharingType, sharingType) || other.sharingType == sharingType)&&(identical(other.rentAmount, rentAmount) || other.rentAmount == rentAmount)&&(identical(other.status, status) || other.status == status)&&(identical(other.gender, gender) || other.gender == gender)&&(identical(other.unitType, unitType) || other.unitType == unitType)&&(identical(other.isDisabledForRent, isDisabledForRent) || other.isDisabledForRent == isDisabledForRent)&&(identical(other.isPublished, isPublished) || other.isPublished == isPublished)&&(identical(other.availableFrom, availableFrom) || other.availableFrom == availableFrom)&&(identical(other.property, property) || other.property == property)&&const DeepCollectionEquality().equals(other.beds, beds)&&const DeepCollectionEquality().equals(other.images, images)&&const DeepCollectionEquality().equals(other.amenities, amenities)&&(identical(other.description, description) || other.description == description)&&(identical(other.remarks, remarks) || other.remarks == remarks));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Room&&(identical(other.id, id) || other.id == id)&&(identical(other.roomNumber, roomNumber) || other.roomNumber == roomNumber)&&(identical(other.floor, floor) || other.floor == floor)&&(identical(other.sharingType, sharingType) || other.sharingType == sharingType)&&(identical(other.rentAmount, rentAmount) || other.rentAmount == rentAmount)&&(identical(other.status, status) || other.status == status)&&(identical(other.gender, gender) || other.gender == gender)&&(identical(other.unitType, unitType) || other.unitType == unitType)&&(identical(other.dailyStayMinPaise, dailyStayMinPaise) || other.dailyStayMinPaise == dailyStayMinPaise)&&(identical(other.dailyStayMaxPaise, dailyStayMaxPaise) || other.dailyStayMaxPaise == dailyStayMaxPaise)&&(identical(other.areaSqft, areaSqft) || other.areaSqft == areaSqft)&&(identical(other.isDisabledForRent, isDisabledForRent) || other.isDisabledForRent == isDisabledForRent)&&(identical(other.isPublished, isPublished) || other.isPublished == isPublished)&&(identical(other.availableFrom, availableFrom) || other.availableFrom == availableFrom)&&(identical(other.property, property) || other.property == property)&&const DeepCollectionEquality().equals(other.beds, beds)&&const DeepCollectionEquality().equals(other.images, images)&&const DeepCollectionEquality().equals(other.amenities, amenities)&&(identical(other.description, description) || other.description == description)&&(identical(other.remarks, remarks) || other.remarks == remarks));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,roomNumber,floor,sharingType,rentAmount,status,gender,unitType,isDisabledForRent,isPublished,availableFrom,property,const DeepCollectionEquality().hash(beds),const DeepCollectionEquality().hash(images),const DeepCollectionEquality().hash(amenities),description,remarks);
+int get hashCode => Object.hashAll([runtimeType,id,roomNumber,floor,sharingType,rentAmount,status,gender,unitType,dailyStayMinPaise,dailyStayMaxPaise,areaSqft,isDisabledForRent,isPublished,availableFrom,property,const DeepCollectionEquality().hash(beds),const DeepCollectionEquality().hash(images),const DeepCollectionEquality().hash(amenities),description,remarks]);
 
 @override
 String toString() {
-  return 'Room(id: $id, roomNumber: $roomNumber, floor: $floor, sharingType: $sharingType, rentAmount: $rentAmount, status: $status, gender: $gender, unitType: $unitType, isDisabledForRent: $isDisabledForRent, isPublished: $isPublished, availableFrom: $availableFrom, property: $property, beds: $beds, images: $images, amenities: $amenities, description: $description, remarks: $remarks)';
+  return 'Room(id: $id, roomNumber: $roomNumber, floor: $floor, sharingType: $sharingType, rentAmount: $rentAmount, status: $status, gender: $gender, unitType: $unitType, dailyStayMinPaise: $dailyStayMinPaise, dailyStayMaxPaise: $dailyStayMaxPaise, areaSqft: $areaSqft, isDisabledForRent: $isDisabledForRent, isPublished: $isPublished, availableFrom: $availableFrom, property: $property, beds: $beds, images: $images, amenities: $amenities, description: $description, remarks: $remarks)';
 }
 
 
@@ -566,7 +572,7 @@ abstract mixin class _$RoomCopyWith<$Res> implements $RoomCopyWith<$Res> {
   factory _$RoomCopyWith(_Room value, $Res Function(_Room) _then) = __$RoomCopyWithImpl;
 @override @useResult
 $Res call({
- String id, String roomNumber, String floor, String sharingType, int rentAmount, String status, String gender, String unitType, bool isDisabledForRent, bool isPublished, String? availableFrom, PropertySummary? property, List<Bed> beds, List<String> images, List<String> amenities, String? description, String? remarks
+ String id, String roomNumber, String floor, String sharingType, int rentAmount, String status, String gender, String unitType, int? dailyStayMinPaise, int? dailyStayMaxPaise, int? areaSqft, bool isDisabledForRent, bool isPublished, String? availableFrom, PropertySummary? property, List<Bed> beds, List<String> images, List<String> amenities, String? description, String? remarks
 });
 
 
@@ -583,7 +589,7 @@ class __$RoomCopyWithImpl<$Res>
 
 /// Create a copy of Room
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? roomNumber = null,Object? floor = null,Object? sharingType = null,Object? rentAmount = null,Object? status = null,Object? gender = null,Object? unitType = null,Object? isDisabledForRent = null,Object? isPublished = null,Object? availableFrom = freezed,Object? property = freezed,Object? beds = null,Object? images = null,Object? amenities = null,Object? description = freezed,Object? remarks = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? roomNumber = null,Object? floor = null,Object? sharingType = null,Object? rentAmount = null,Object? status = null,Object? gender = null,Object? unitType = null,Object? dailyStayMinPaise = freezed,Object? dailyStayMaxPaise = freezed,Object? areaSqft = freezed,Object? isDisabledForRent = null,Object? isPublished = null,Object? availableFrom = freezed,Object? property = freezed,Object? beds = null,Object? images = null,Object? amenities = null,Object? description = freezed,Object? remarks = freezed,}) {
   return _then(_Room(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,roomNumber: null == roomNumber ? _self.roomNumber : roomNumber // ignore: cast_nullable_to_non_nullable
@@ -593,7 +599,10 @@ as String,rentAmount: null == rentAmount ? _self.rentAmount : rentAmount // igno
 as int,status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
 as String,gender: null == gender ? _self.gender : gender // ignore: cast_nullable_to_non_nullable
 as String,unitType: null == unitType ? _self.unitType : unitType // ignore: cast_nullable_to_non_nullable
-as String,isDisabledForRent: null == isDisabledForRent ? _self.isDisabledForRent : isDisabledForRent // ignore: cast_nullable_to_non_nullable
+as String,dailyStayMinPaise: freezed == dailyStayMinPaise ? _self.dailyStayMinPaise : dailyStayMinPaise // ignore: cast_nullable_to_non_nullable
+as int?,dailyStayMaxPaise: freezed == dailyStayMaxPaise ? _self.dailyStayMaxPaise : dailyStayMaxPaise // ignore: cast_nullable_to_non_nullable
+as int?,areaSqft: freezed == areaSqft ? _self.areaSqft : areaSqft // ignore: cast_nullable_to_non_nullable
+as int?,isDisabledForRent: null == isDisabledForRent ? _self.isDisabledForRent : isDisabledForRent // ignore: cast_nullable_to_non_nullable
 as bool,isPublished: null == isPublished ? _self.isPublished : isPublished // ignore: cast_nullable_to_non_nullable
 as bool,availableFrom: freezed == availableFrom ? _self.availableFrom : availableFrom // ignore: cast_nullable_to_non_nullable
 as String?,property: freezed == property ? _self.property : property // ignore: cast_nullable_to_non_nullable

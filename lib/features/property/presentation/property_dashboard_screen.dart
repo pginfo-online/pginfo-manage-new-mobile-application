@@ -39,35 +39,43 @@ class _PropertyDashboardState extends ConsumerState<PropertyDashboardScreen> {
     final properties =
         ref.watch(propertiesProvider).asData?.value ?? <Property>[];
     final property = properties.where((p) => p.id == propertyId).firstOrNull;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return DefaultTabController(
       length: 4,
       child: Scaffold(
-        backgroundColor: PgTheme.analyticsCanvas,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         appBar: AppBar(
+          backgroundColor: isDark ? PgTheme.darkCard : PgTheme.blue,
           title: InkWell(
             onTap: () => context.push('/properties/select'),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.apartment),
-                const SizedBox(width: 10),
-                Flexible(
-                  child: Text(
-                    property?.name ?? 'Select property',
-                    overflow: TextOverflow.ellipsis,
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.apartment),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      property?.name ?? 'Select property',
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
                   ),
-                ),
-                const Icon(Icons.keyboard_arrow_down),
-              ],
+                  const Icon(Icons.keyboard_arrow_down),
+                ],
+              ),
             ),
           ),
-          bottom: const TabBar(
+          bottom: TabBar(
             isScrollable: true,
             tabAlignment: TabAlignment.start,
             indicatorColor: Colors.white,
             labelColor: Colors.white,
-            unselectedLabelColor: Color(0xffb9c5fa),
-            tabs: [
+            unselectedLabelColor: isDark ? Colors.white60 : const Color(0xffb9c5fa),
+            tabs: const [
               Tab(text: 'Room'),
               Tab(text: 'Listing'),
               Tab(text: 'Complaint'),
@@ -78,6 +86,8 @@ class _PropertyDashboardState extends ConsumerState<PropertyDashboardScreen> {
         floatingActionButton: propertyId == null
             ? null
             : FloatingActionButton(
+                backgroundColor: PgTheme.blue,
+                foregroundColor: Colors.white,
                 onPressed: () => context.push('/rooms/new'),
                 child: const Icon(Icons.add),
               ),
@@ -93,9 +103,12 @@ class _PropertyDashboardState extends ConsumerState<PropertyDashboardScreen> {
                   _roomTab(propertyId, property, rooms),
                   _listingTab(rooms),
                   _complaintTab(propertyId),
-                  const Center(
+                  Center(
                     child: Text(
                       'No food service data is available for this property.',
+                      style: TextStyle(
+                        color: isDark ? Colors.white70 : Colors.black87,
+                      ),
                     ),
                   ),
                 ],
@@ -112,6 +125,8 @@ class _PropertyDashboardState extends ConsumerState<PropertyDashboardScreen> {
     final floor = ref.watch(roomFloorProvider);
     final filters = ref.watch(roomFilterProvider);
     final rooms = roomValue.asData?.value;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     final visible =
         rooms
             ?.where(
@@ -143,12 +158,17 @@ class _PropertyDashboardState extends ConsumerState<PropertyDashboardScreen> {
             )
             .toList() ??
         <Room>[];
+
     return RefreshIndicator(
+      color: PgTheme.blue,
       onRefresh: () async {
-        ref.invalidate(roomsProvider);
-        await ref.read(roomsProvider.future);
+        await Future.wait([
+          ref.read(roomsProvider.notifier).refresh(),
+          ref.refresh(propertiesProvider.future),
+        ]);
       },
       child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
           SliverToBoxAdapter(
             child: Padding(
@@ -241,18 +261,37 @@ class _PropertyDashboardState extends ConsumerState<PropertyDashboardScreen> {
           if (rooms == null && roomValue.hasError)
             SliverToBoxAdapter(
               child: Center(
-                child: TextButton(
-                  onPressed: () => ref.invalidate(roomsProvider),
-                  child: const Text('Retry loading rooms'),
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    children: [
+                      Text(
+                        'Failed to load rooms',
+                        style: TextStyle(
+                          color: isDark ? Colors.white70 : Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextButton(
+                        onPressed: () => ref.read(roomsProvider.notifier).refresh(),
+                        child: const Text('Retry loading rooms'),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
           if (rooms != null && visible.isEmpty)
-            const SliverToBoxAdapter(
+            SliverToBoxAdapter(
               child: Padding(
-                padding: EdgeInsets.all(32),
+                padding: const EdgeInsets.all(32),
                 child: Center(
-                  child: Text('No rooms match your search or filters.'),
+                  child: Text(
+                    'No rooms match your search or filters.',
+                    style: TextStyle(
+                      color: isDark ? Colors.white60 : Colors.black54,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -269,9 +308,12 @@ class _PropertyDashboardState extends ConsumerState<PropertyDashboardScreen> {
           if (ref.read(roomsProvider.notifier).hasMore && rooms != null)
             SliverToBoxAdapter(
               child: Center(
-                child: TextButton(
-                  onPressed: () => ref.read(roomsProvider.notifier).loadMore(),
-                  child: const Text('Load more rooms'),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: TextButton(
+                    onPressed: () => ref.read(roomsProvider.notifier).loadMore(),
+                    child: const Text('Load more rooms'),
+                  ),
                 ),
               ),
             ),
@@ -283,6 +325,7 @@ class _PropertyDashboardState extends ConsumerState<PropertyDashboardScreen> {
 
   Widget _summaryCard(String label, String value, {VoidCallback? onTap}) =>
       Card(
+        color: PgTheme.cardBg(context),
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(16),
@@ -300,58 +343,80 @@ class _PropertyDashboardState extends ConsumerState<PropertyDashboardScreen> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                Text(label, maxLines: 2),
+                Text(
+                  label,
+                  maxLines: 2,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
               ],
             ),
           ),
         ),
       );
+
   Widget _listingTab(AsyncValue<List<Room>> rooms) => PgAsync(
-    value: rooms,
-    data: (items) {
-      final published = items.where((room) => room.isPublished).toList();
-      return ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Text(
-            'Published rooms',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          for (final room in published) RoomDashboardCard(room: room),
-          if (published.isEmpty && !ref.read(roomsProvider.notifier).hasMore)
-            const Padding(
-              padding: EdgeInsets.all(24),
-              child: Text('No rooms are published.'),
-            ),
-          if (ref.read(roomsProvider.notifier).hasMore)
-            Center(
-              child: TextButton(
-                onPressed: () => ref.read(roomsProvider.notifier).loadMore(),
-                child: const Text('Load more rooms'),
+        value: rooms,
+        data: (items) {
+          final published = items.where((room) => room.isPublished).toList();
+          return ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(16),
+            children: [
+              Text(
+                'Published rooms',
+                style: Theme.of(context).textTheme.titleLarge,
               ),
-            ),
-        ],
+              const SizedBox(height: 12),
+              for (final room in published)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: RoomDashboardCard(room: room),
+                ),
+              if (published.isEmpty && !ref.read(roomsProvider.notifier).hasMore)
+                const Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Center(child: Text('No rooms are published.')),
+                ),
+              if (ref.read(roomsProvider.notifier).hasMore)
+                Center(
+                  child: TextButton(
+                    onPressed: () => ref.read(roomsProvider.notifier).loadMore(),
+                    child: const Text('Load more rooms'),
+                  ),
+                ),
+            ],
+          );
+        },
       );
-    },
-  );
+
   Widget _complaintTab(String id) => Consumer(
-    builder: (context, ref, _) => PgAsync(
-      value: ref.watch(_complaintsForProperty(id)),
-      data: (items) => ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          if (items.isEmpty) const Text('No complaints for this property.'),
-          for (final item in items)
-            Card(
-              child: ListTile(
-                title: Text('${item['description'] ?? 'Complaint'}'),
-                subtitle: Text('${item['status'] ?? ''}'),
-              ),
-            ),
-        ],
-      ),
-    ),
-  );
+        builder: (context, ref, _) => PgAsync(
+          value: ref.watch(_complaintsForProperty(id)),
+          data: (items) => ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(16),
+            children: [
+              if (items.isEmpty)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(32),
+                    child: Text('No complaints for this property.'),
+                  ),
+                ),
+              for (final item in items)
+                Card(
+                  color: PgTheme.cardBg(context),
+                  child: ListTile(
+                    title: Text('${item['description'] ?? 'Complaint'}'),
+                    subtitle: Text('${item['status'] ?? ''}'),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
 }
 
 class RoomDashboardCard extends ConsumerStatefulWidget {
@@ -362,7 +427,9 @@ class RoomDashboardCard extends ConsumerStatefulWidget {
 }
 
 class _RoomDashboardCardState extends ConsumerState<RoomDashboardCard> {
-  bool open = false, busy = false;
+  bool open = false;
+  bool busy = false;
+
   Future<void> action(String path, {bool delete = false}) async {
     if (delete) {
       final confirmed = await showDialog<bool>(
@@ -379,30 +446,48 @@ class _RoomDashboardCardState extends ConsumerState<RoomDashboardCard> {
             ),
             TextButton(
               onPressed: () => Navigator.pop(dialog, true),
-              child: const Text('Delete'),
+              child: const Text(
+                'Delete',
+                style: TextStyle(color: Colors.red),
+              ),
             ),
           ],
         ),
       );
       if (confirmed != true) return;
     }
+
     setState(() => busy = true);
+    final isDisableRent = path.contains('toggle-disable-rent');
+    final isPublish = path.contains('toggle-publish');
+
+    // Optimistic UI updates - instant response for user
+    if (delete) {
+      ref.read(roomsProvider.notifier).removeOptimisticRoom(widget.room.id);
+    } else if (isDisableRent) {
+      ref
+          .read(roomsProvider.notifier)
+          .toggleDisableRentOptimistic(widget.room.id);
+    } else if (isPublish) {
+      ref.read(roomsProvider.notifier).togglePublishOptimistic(widget.room.id);
+    }
+    setState(() => open = false);
+
     try {
       if (delete) {
         await ref.read(operationsViewModelProvider).delete(path);
       } else {
         await ref.read(operationsViewModelProvider).update(path, {});
       }
-      ref.invalidate(roomsProvider);
       ref.invalidate(roomProvider(widget.room.id));
+      ref.invalidate(propertiesProvider);
     } catch (error) {
+      // Revert optimistic update on failure
+      ref.read(roomsProvider.notifier).refresh();
       if (mounted) showError(context, error);
     } finally {
       if (mounted) {
-        setState(() {
-          busy = false;
-          open = false;
-        });
+        setState(() => busy = false);
       }
     }
   }
@@ -411,6 +496,11 @@ class _RoomDashboardCardState extends ConsumerState<RoomDashboardCard> {
   Widget build(BuildContext context) {
     final room = widget.room;
     final vacant = room.beds.where((b) => b.status == 'AVAILABLE').length;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardBg = PgTheme.cardBg(context);
+    final secondaryBg = PgTheme.secondaryBg(context);
+    final headerBg = PgTheme.subtleHeaderBg(context);
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(18),
       child: Stack(
@@ -418,7 +508,8 @@ class _RoomDashboardCardState extends ConsumerState<RoomDashboardCard> {
           Positioned.fill(
             child: Align(
               alignment: Alignment.centerRight,
-              child: SizedBox(
+              child: Container(
+                color: isDark ? const Color(0xff161926) : const Color(0xfff3f4f8),
                 width: 165,
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -432,8 +523,9 @@ class _RoomDashboardCardState extends ConsumerState<RoomDashboardCard> {
                     TextButton(
                       onPressed: busy
                           ? null
-                          : () =>
-                                action('/rooms/${room.id}/toggle-disable-rent'),
+                          : () => action(
+                                '/rooms/${room.id}/toggle-disable-rent',
+                              ),
                       child: Text(
                         room.isDisabledForRent
                             ? 'Enable for Rent'
@@ -467,7 +559,7 @@ class _RoomDashboardCardState extends ConsumerState<RoomDashboardCard> {
               onHorizontalDragEnd: (details) =>
                   setState(() => open = (details.primaryVelocity ?? 0) < 0),
               child: Material(
-                color: Colors.white,
+                color: cardBg,
                 child: Column(
                   children: [
                     InkWell(
@@ -482,15 +574,23 @@ class _RoomDashboardCardState extends ConsumerState<RoomDashboardCard> {
                                 width: 60,
                                 height: 60,
                                 child: room.images.isEmpty
-                                    ? const ColoredBox(
-                                        color: Color(0xffe9edff),
-                                        child: Icon(Icons.bed_outlined),
+                                    ? ColoredBox(
+                                        color: headerBg,
+                                        child: const Icon(
+                                          Icons.bed_outlined,
+                                          color: PgTheme.blue,
+                                        ),
                                       )
                                     : Image.network(
                                         room.images.first,
                                         fit: BoxFit.cover,
-                                        errorBuilder: (_, _, _) =>
-                                            const Icon(Icons.bed_outlined),
+                                        errorBuilder: (_, _, _) => ColoredBox(
+                                          color: headerBg,
+                                          child: const Icon(
+                                            Icons.bed_outlined,
+                                            color: PgTheme.blue,
+                                          ),
+                                        ),
                                       ),
                               ),
                             ),
@@ -510,11 +610,19 @@ class _RoomDashboardCardState extends ConsumerState<RoomDashboardCard> {
                                   Text(
                                     '${rupees(room.rentAmount)}/bed · ${room.unitType} · ${room.sharingType.replaceAll('_', ' ')}',
                                     maxLines: 2,
+                                    style: TextStyle(
+                                      color: isDark
+                                          ? Colors.white70
+                                          : const Color(0xff4b5563),
+                                    ),
                                   ),
                                 ],
                               ),
                             ),
-                            const Icon(Icons.more_vert, color: PgTheme.blue),
+                            IconButton(
+                              icon: const Icon(Icons.more_vert, color: PgTheme.blue),
+                              onPressed: () => setState(() => open = !open),
+                            ),
                           ],
                         ),
                       ),
@@ -539,16 +647,16 @@ class _RoomDashboardCardState extends ConsumerState<RoomDashboardCard> {
                                   alignment: Alignment.center,
                                   decoration: BoxDecoration(
                                     color: bed.status == 'AVAILABLE'
-                                        ? const Color(0xffe8f7e8)
-                                        : const Color(0xffffe9e9),
+                                        ? PgTheme.availableBedBg(context)
+                                        : PgTheme.occupiedBedBg(context),
                                     borderRadius: BorderRadius.circular(5),
                                   ),
                                   child: Icon(
                                     Icons.bed,
                                     size: 20,
                                     color: bed.status == 'AVAILABLE'
-                                        ? Colors.green
-                                        : Colors.red,
+                                        ? PgTheme.availableBedFg(context)
+                                        : PgTheme.occupiedBedFg(context),
                                   ),
                                 ),
                               ),
@@ -564,7 +672,7 @@ class _RoomDashboardCardState extends ConsumerState<RoomDashboardCard> {
                       ),
                     ),
                     Container(
-                      color: const Color(0xfff8f9fd),
+                      color: secondaryBg,
                       padding: const EdgeInsets.all(12),
                       child: Row(
                         children: [
@@ -604,6 +712,7 @@ void showRoomDetailsSheet(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
+    backgroundColor: Theme.of(context).cardColor,
     builder: (sheetContext) => SafeArea(
       child: FractionallySizedBox(
         heightFactor: 0.85,
@@ -628,15 +737,21 @@ void showRoomDetailsSheet(
                       padding: const EdgeInsets.all(20),
                       child: Row(
                         children: [
-                          SizedBox(
-                            width: 86,
-                            height: 86,
-                            child: room.images.isEmpty
-                                ? const Icon(Icons.bed, size: 50)
-                                : Image.network(
-                                    room.images.first,
-                                    fit: BoxFit.cover,
-                                  ),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: SizedBox(
+                              width: 86,
+                              height: 86,
+                              child: room.images.isEmpty
+                                  ? ColoredBox(
+                                      color: PgTheme.subtleHeaderBg(context),
+                                      child: const Icon(Icons.bed, size: 50, color: PgTheme.blue),
+                                    )
+                                  : Image.network(
+                                      room.images.first,
+                                      fit: BoxFit.cover,
+                                    ),
+                            ),
                           ),
                           const SizedBox(width: 16),
                           Expanded(
@@ -647,14 +762,20 @@ void showRoomDetailsSheet(
                                   room.roomNumber,
                                   style: Theme.of(context)
                                       .textTheme
-                                      .headlineSmall,
+                                      .headlineSmall
+                                      ?.copyWith(fontWeight: FontWeight.bold),
                                 ),
+                                const SizedBox(height: 4),
                                 Text(
                                   '${room.floor} Floor · ${room.unitType} · ${room.sharingType.replaceAll('_', ' ')}',
                                 ),
+                                const SizedBox(height: 4),
                                 Text(
                                   '${room.beds.where((b) => b.status == 'AVAILABLE').length} bed vacant',
-                                  style: const TextStyle(color: PgTheme.blue),
+                                  style: const TextStyle(
+                                    color: PgTheme.blue,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ],
                             ),
@@ -677,15 +798,15 @@ void showRoomDetailsSheet(
                                   Icon(
                                     Icons.bed,
                                     color: bed.status == 'AVAILABLE'
-                                        ? Colors.green
-                                        : Colors.red,
+                                        ? PgTheme.availableBedFg(context)
+                                        : PgTheme.occupiedBedFg(context),
                                   ),
                                   Text(bed.bedNumber),
                                 ],
                               ),
                               backgroundColor: bed.status == 'AVAILABLE'
-                                  ? const Color(0xffe8f7e8)
-                                  : const Color(0xffffe9e9),
+                                  ? PgTheme.availableBedBg(context)
+                                  : PgTheme.occupiedBedBg(context),
                               onPressed: () =>
                                   setSheetState(() => selectedBedId = bed.id),
                             ),
@@ -794,6 +915,7 @@ class _PropertyRoomSkeletonState extends State<PropertyRoomSkeleton>
     vsync: this,
     duration: const Duration(milliseconds: 1400),
   )..repeat();
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -812,69 +934,74 @@ class _PropertyRoomSkeletonState extends State<PropertyRoomSkeleton>
 
   @override
   Widget build(BuildContext context) {
-    Widget block(double width, double height) => Container(
-      width: width,
-      height: height,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
-        gradient: LinearGradient(
-          begin: Alignment(-1 + animation.value * 2, 0),
-          end: Alignment(animation.value * 2, 0),
-          colors: const [
-            Color(0xffeceef3),
-            Color(0xfffafbfc),
-            Color(0xffeceef3),
-          ],
-        ),
-      ),
-    );
+    final baseColor = PgTheme.skeletonBase(context);
+    final highlightColor = PgTheme.skeletonHighlight(context);
+
+    Widget block(double width, double height, {double radius = 8}) => Container(
+          width: width,
+          height: height,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(radius),
+            gradient: LinearGradient(
+              begin: Alignment(-1 + animation.value * 2, 0),
+              end: Alignment(animation.value * 2, 0),
+              colors: [
+                baseColor,
+                highlightColor,
+                baseColor,
+              ],
+            ),
+          ),
+        );
+
     return Semantics(
       label: 'Loading rooms',
       child: ExcludeSemantics(
         child: AnimatedBuilder(
           animation: animation,
           builder: (context, _) => Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Column(
               children: [
                 for (var i = 0; i < 3; i++)
                   Card(
                     margin: const EdgeInsets.only(bottom: 16),
+                    color: PgTheme.cardBg(context),
                     child: Padding(
                       padding: const EdgeInsets.all(16),
                       child: Column(
                         children: [
                           Row(
                             children: [
-                              block(60, 60),
+                              block(60, 60, radius: 10),
                               const SizedBox(width: 12),
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  block(76, 18),
-                                  const SizedBox(height: 12),
+                                  block(80, 20),
+                                  const SizedBox(height: 10),
                                   block(170, 14),
                                 ],
                               ),
                             ],
                           ),
-                          const SizedBox(height: 18),
+                          const SizedBox(height: 16),
                           Row(
                             children: [
                               for (var n = 0; n < 4; n++) ...[
-                                block(34, 40),
+                                block(34, 40, radius: 6),
                                 const SizedBox(width: 8),
                               ],
                               const Spacer(),
-                              block(40, 40),
+                              block(40, 40, radius: 20),
                             ],
                           ),
-                          const SizedBox(height: 18),
+                          const SizedBox(height: 14),
                           Row(
                             children: [
-                              block(110, 28),
+                              block(110, 28, radius: 14),
                               const SizedBox(width: 8),
-                              block(90, 28),
+                              block(90, 28, radius: 14),
                             ],
                           ),
                         ],

@@ -149,8 +149,10 @@ class PgRepository {
   Future<Room> room(String id) async => Room.fromJson(
     Map<String, dynamic>.from(await api.get('/rooms/$id') as Map),
   );
-  Future<void> createRoom(String propertyId, Map<String, dynamic> body) async =>
-      api.post('/properties/$propertyId/rooms', body);
+  Future<Room> createRoom(String propertyId, Map<String, dynamic> body) async {
+    final res = await api.post('/properties/$propertyId/rooms', body);
+    return Room.fromJson(Map<String, dynamic>.from(res as Map));
+  }
   Future<List<Resident>> residents({
     String? propertyId,
     String? search,
@@ -261,7 +263,7 @@ class PgOperationsViewModel {
       _repository.switchOrganization(id);
   Future<Property> createProperty(Map<String, dynamic> body) =>
       _repository.createProperty(body);
-  Future<void> createRoom(String propertyId, Map<String, dynamic> body) =>
+  Future<Room> createRoom(String propertyId, Map<String, dynamic> body) =>
       _repository.createRoom(propertyId, body);
   Future<Resident> resident(String id) => _repository.resident(id);
   Future<Map<String, dynamic>> residentDetails(String id) =>
@@ -366,6 +368,64 @@ class RoomsViewModel extends AsyncNotifier<List<Room>> {
         .rooms(propertyId, search: search, floor: floor);
     hasMore = items.length == 20;
     return items;
+  }
+
+  Future<void> refresh() async {
+    final propertyId = ref.read(selectedPropertyProvider);
+    final search = ref.read(roomSearchProvider);
+    final floor = ref.read(roomFloorProvider);
+    if (propertyId == null) return;
+    try {
+      final items = await ref
+          .read(repositoryProvider)
+          .rooms(propertyId, page: 1, search: search, floor: floor);
+      page = 1;
+      hasMore = items.length == 20;
+      state = AsyncData(items);
+    } catch (e, st) {
+      if (state.asData == null) {
+        state = AsyncError(e, st);
+      }
+    }
+  }
+
+  void addOptimisticRoom(Room room) {
+    final current = state.asData?.value ?? [];
+    state = AsyncData([room, ...current]);
+  }
+
+  void updateOptimisticRoom(Room room) {
+    final current = state.asData?.value ?? [];
+    state = AsyncData(current.map((r) => r.id == room.id ? room : r).toList());
+  }
+
+  void removeOptimisticRoom(String roomId) {
+    final current = state.asData?.value ?? [];
+    state = AsyncData(current.where((r) => r.id != roomId).toList());
+  }
+
+  void toggleDisableRentOptimistic(String roomId) {
+    final current = state.asData?.value ?? [];
+    state = AsyncData(
+      current
+          .map(
+            (r) => r.id == roomId
+                ? r.copyWith(isDisabledForRent: !r.isDisabledForRent)
+                : r,
+          )
+          .toList(),
+    );
+  }
+
+  void togglePublishOptimistic(String roomId) {
+    final current = state.asData?.value ?? [];
+    state = AsyncData(
+      current
+          .map(
+            (r) => r.id == roomId ? r.copyWith(isPublished: !r.isPublished) : r,
+          )
+          .toList(),
+    );
   }
 
   Future<void> loadMore() async {

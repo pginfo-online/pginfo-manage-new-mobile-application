@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/di/providers.dart';
+import '../../../core/design_system/theme.dart';
 import '../../../shared/components/common.dart';
 import '../../../shared/models/models.dart';
 
@@ -51,11 +52,15 @@ class _PropertyState extends ConsumerState<PropertyScreen> {
               ),
             )
           : RefreshIndicator(
+              color: PgTheme.blue,
               onRefresh: () async {
-                ref.invalidate(roomsProvider);
-                await ref.read(roomsProvider.future);
+                await Future.wait([
+                  ref.read(roomsProvider.notifier).refresh(),
+                  ref.refresh(propertiesProvider.future),
+                ]);
               },
               child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.all(16),
                 children: [
                   SearchField(
@@ -201,15 +206,17 @@ class _RoomCard extends StatelessWidget {
                   width: 56,
                   height: 56,
                   child: room.images.isEmpty
-                      ? const ColoredBox(
-                          color: Color(0xffe4eaff),
-                          child: Icon(Icons.bed_outlined),
+                      ? ColoredBox(
+                          color: PgTheme.subtleHeaderBg(context),
+                          child: const Icon(Icons.bed_outlined, color: Color(0xff2563eb)),
                         )
                       : Image.network(
                           room.images.first,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) =>
-                              const Icon(Icons.bed_outlined),
+                          errorBuilder: (_, _, _) => ColoredBox(
+                            color: PgTheme.subtleHeaderBg(context),
+                            child: const Icon(Icons.bed_outlined, color: Color(0xff2563eb)),
+                          ),
                         ),
                 ),
               ),
@@ -298,7 +305,7 @@ class PropertySelectScreen extends ConsumerWidget {
                     ),
                   ),
                   if (ref.watch(selectedPropertyProvider) == p.id)
-                    const Icon(Icons.check_circle, color: Color(0xff3156f5)),
+                    const Icon(Icons.check_circle, color: Color(0xff2563eb)),
                 ],
               ),
             ),
