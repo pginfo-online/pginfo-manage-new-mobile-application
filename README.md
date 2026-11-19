@@ -10,20 +10,12 @@ dart run build_runner build
 flutter run --dart-define=API_BASE_URL=http://10.0.2.2:3000/api/v1
 ```
 
+
+## to run the application the chrome 
+
+flutter run -d chrome --web-port=3001 --dart-define=API_BASE_URL=https://pginfo.space/api/v1
+
 `10.0.2.2` resolves to the development host from the Android emulator. For a physical Android device on the same Wi-Fi, use your computer's LAN IP instead, for example `http://192.168.1.44:3000/api/v1`. HTTP is permitted only in Android debug builds; release builds require HTTPS. Start the backend, PostgreSQL, and Redis as described in `../backend/README.md`.
-
-
-
-hh hdc uhuhuhu hgg  hnhy6 iina 99 8u  innsac7sac  hscs
-] sdcnsc
-\ jdjsdy7ew mjjewijd 
-nscscns 
-ncsdjcds u  jjduc ds
-hfhscbds 
-jfndsnsdy  je8e jj8 jjd jjdcyds jjjy ujjy nidjsh   jjuu  j
-
-
-  dcwi ddi n win    8hhuuhsd uuuud nnndncds nnndcd hhe 
 
 
 
