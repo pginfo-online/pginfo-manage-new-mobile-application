@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import '../../money/money_data.dart';
 import 'tenant_skeleton.dart';
 import 'tenant_actions.dart' show allocationRoomsProvider;
 
@@ -11,6 +12,7 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../app/di/providers.dart';
+import '../../../core/design_system/theme.dart';
 import '../../../shared/components/common.dart';
 import '../../../shared/models/models.dart';
 
@@ -43,6 +45,30 @@ class _OpeningEntry {
 class _AddTenantState extends ConsumerState<AddTenantScreen>
     with SingleTickerProviderStateMixin {
   late final tabs = TabController(length: 3, vsync: this);
+  final sections = List.generate(3, (_) => GlobalKey());
+  static const frequencies = {
+    '1': 'Monthly',
+    '3': 'Quarterly',
+    '6': 'Half-yearly',
+    '10': 'Every 10 months',
+    '11': 'Every 11 months',
+    '12': 'Yearly',
+  };
+  String frequency = '1';
+  bool includeOpeningRent = true;
+
+  void showSection(int index) {
+    tabs.animateTo(index);
+    final section = sections[index].currentContext;
+    if (section != null) {
+      Scrollable.ensureVisible(
+        section,
+        duration: const Duration(milliseconds: 320),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
   final first = TextEditingController(),
       last = TextEditingController(),
       phone = TextEditingController(),
@@ -61,7 +87,7 @@ class _AddTenantState extends ConsumerState<AddTenantScreen>
   String? roomId, bedId, propertyId, allocationLabel;
   String stayType = 'LONG_TERM', tenantType = 'OTHER';
   bool whatsapp = true, busy = false;
-  DateTime moveIn = DateTime.now();
+  DateTime moveIn = DateUtils.dateOnly(DateTime.now());
   DateTime? moveOut;
   @override
   void initState() {
@@ -165,37 +191,27 @@ class _AddTenantState extends ConsumerState<AddTenantScreen>
                               ExpansionTile(
                                 title: Text('Room ${room.roomNumber}'),
                                 subtitle: Text(
-                                  '${room.beds.where((bed) => bed.status == 'AVAILABLE').length} available beds',
+                                  '${room.beds.where((bed) => bed.status == 'AVAILABLE' && !bed.isDisabledForRent && !room.isDisabledForRent).length} available beds',
                                 ),
                                 children: [
-                                  for (final bed in room.beds.where(
-                                    (bed) => bed.status == 'AVAILABLE',
-                                  ))
+                                  for (final bed in room.beds)
+                                    _bedTile(sheetContext, room, bed),
+                                  if (room.beds.isEmpty &&
+                                      !room.isDisabledForRent)
                                     ListTile(
-                                      leading: const Icon(Icons.bed_outlined),
-                                      title: Text('Bed ${bed.bedNumber}'),
+                                      title: const Text(
+                                        'Select room without a bed',
+                                      ),
                                       onTap: () {
                                         setState(() {
                                           roomId = room.id;
-                                          bedId = bed.id;
+                                          bedId = null;
                                           allocationLabel =
-                                              'Room ${room.roomNumber} · Bed ${bed.bedNumber}';
+                                              'Room ${room.roomNumber}';
                                         });
                                         Navigator.pop(sheetContext);
                                       },
                                     ),
-                                  ListTile(
-                                    title: const Text(
-                                      'Select room without a bed',
-                                    ),
-                                    onTap: () {
-                                      setState(() {
-                                        roomId = room.id;
-                                        bedId = null;
-                                      });
-                                      Navigator.pop(sheetContext);
-                                    },
-                                  ),
                                 ],
                               ),
                           ],
@@ -211,6 +227,44 @@ class _AddTenantState extends ConsumerState<AddTenantScreen>
       ),
     );
     debounce?.cancel();
+  }
+
+  Widget _bedTile(BuildContext sheetContext, Room room, Bed bed) {
+    final vacant =
+        bed.status == 'AVAILABLE' &&
+        !bed.isDisabledForRent &&
+        !room.isDisabledForRent;
+    final occupied = bed.status == 'OCCUPIED';
+    return ListTile(
+      enabled: vacant,
+      leading: Icon(
+        Icons.bed_outlined,
+        color: vacant
+            ? PgTheme.occupiedBedFg(context)
+            : occupied
+            ? PgTheme.availableBedFg(context)
+            : Theme.of(context).colorScheme.onSurfaceVariant,
+      ),
+      title: Text('Bed ${bed.bedNumber}'),
+      subtitle: Text(
+        vacant
+            ? 'Vacant'
+            : bed.status == 'AVAILABLE'
+            ? 'Unavailable'
+            : bed.status.toLowerCase().replaceAll('_', ' '),
+      ),
+      onTap: !vacant
+          ? null
+          : () {
+              setState(() {
+                roomId = room.id;
+                bedId = bed.id;
+                allocationLabel =
+                    'Room ${room.roomNumber} · Bed ${bed.bedNumber}';
+              });
+              Navigator.pop(sheetContext);
+            },
+    );
   }
 
   Future<void> editOpening({
@@ -361,33 +415,42 @@ class _AddTenantState extends ConsumerState<AddTenantScreen>
   }
 
   Future<void> save() async {
+    if (busy) return;
     final property = propertyId;
-    if (property == null) {
+    if (property == null ||
+        ref.read(propertiesProvider).value?.any((p) => p.id == property) !=
+            true) {
+      showSection(0);
       showError(context, 'Select a property');
       return;
     }
     if (first.text.trim().isEmpty ||
         mobileValidator(phone.text.trim()) != null) {
-      tabs.animateTo(0);
+      showSection(0);
       showError(context, 'Enter a name and valid phone number');
       return;
     }
     if (parentPhone.text.trim().isNotEmpty &&
         mobileValidator(parentPhone.text.trim()) != null) {
-      tabs.animateTo(0);
+      showSection(0);
       showError(context, 'Enter a valid parent phone number');
       return;
     }
     if (alternate.text.trim().isNotEmpty &&
         mobileValidator(alternate.text.trim()) != null) {
-      tabs.animateTo(0);
+      showSection(0);
       showError(context, 'Enter a valid alternate phone number');
       return;
     }
     if ((tryParseRupees(rent.text) ?? 0) <= 0 ||
         (tryParseRupees(deposit.text) ?? -1) < 0) {
-      tabs.animateTo(1);
+      showSection(1);
       showError(context, 'Enter a valid rent and deposit');
+      return;
+    }
+    if (parseRupees(rent.text) * int.parse(frequency) > 2147483647) {
+      showSection(1);
+      showError(context, 'The rent for one billing period is too large');
       return;
     }
     final day = int.tryParse(dueDay.text),
@@ -406,7 +469,7 @@ class _AddTenantState extends ConsumerState<AddTenantScreen>
         agreement < 1 ||
         agreement > 120 ||
         (moveOut != null && moveOut!.isBefore(moveIn))) {
-      tabs.animateTo(1);
+      showSection(1);
       showError(context, 'Check the stay dates and periods');
       return;
     }
@@ -469,15 +532,16 @@ class _AddTenantState extends ConsumerState<AddTenantScreen>
         'noticePeriodDays': notice,
         'agreementPeriodMonths': agreement,
         'monthlyRent': parseRupees(rent.text),
+        'rentalFrequencyMonths': int.parse(frequency),
+        'initialRent': includeOpeningRent ? 'CREATE' : 'SKIP',
         'securityDeposit': parseRupees(deposit.text),
         'rentDueDay': day,
         'notes': remarks.text.trim(),
         'openingBalances': balances,
       });
       ref.invalidate(residentsProvider);
-      ref.invalidate(pagedListProvider);
       ref.invalidate(roomsProvider);
-      ref.invalidate(dashboardProvider);
+      refreshMoney(ref);
       if (mounted) context.pop();
     } catch (error) {
       if (mounted) showError(context, error);
@@ -490,20 +554,17 @@ class _AddTenantState extends ConsumerState<AddTenantScreen>
   Widget build(BuildContext context) {
     final properties = ref.watch(propertiesProvider);
     return Scaffold(
-      backgroundColor: const Color(0xfff3f3f3),
       appBar: AppBar(
-        backgroundColor: const Color(0xffedf1ff),
-        foregroundColor: Colors.black87,
+        backgroundColor: PgTheme.subtleHeaderBg(context),
+        foregroundColor: Theme.of(context).colorScheme.onSurface,
         title: const Text('Add Tenant'),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(64),
           child: ColoredBox(
-            color: Colors.white,
+            color: Theme.of(context).colorScheme.surface,
             child: TabBar(
               controller: tabs,
-              labelColor: const Color(0xff3156f5),
-              unselectedLabelColor: Colors.black54,
-              indicatorColor: const Color(0xff3156f5),
+              onTap: showSection,
               tabs: const [
                 Tab(
                   child: Text('Tenant\nDetails', textAlign: TextAlign.center),
@@ -520,275 +581,395 @@ class _AddTenantState extends ConsumerState<AddTenantScreen>
       body: Column(
         children: [
           Expanded(
-            child: TabBarView(
-              controller: tabs,
-              children: [
-                ListView(
-                  padding: const EdgeInsets.all(16),
+            child: AbsorbPointer(
+              absorbing: busy,
+              child: SingleChildScrollView(
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          children: [
-                            PgField('Name', controller: first),
-                            PgField('Last Name', controller: last),
-                            PgField(
-                              'Phone Number',
-                              controller: phone,
-                              keyboardType: TextInputType.phone,
-                            ),
-                            PgField(
-                              'Alternate Phone Number',
-                              controller: alternate,
-                              keyboardType: TextInputType.phone,
-                            ),
-                            PgField('Parent name', controller: parentName),
-                            PgField(
-                              'Parent phone',
-                              controller: parentPhone,
-                              keyboardType: TextInputType.phone,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    CheckboxListTile(
-                      value: whatsapp,
-                      onChanged: (v) => setState(() => whatsapp = v ?? false),
-                      title: const Text('Send WhatsApp Reminder'),
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                    if (properties.isLoading)
-                      const TenantSkeleton(TenantPlaceholder.fields),
-                    if (properties.hasError)
-                      TextButton(
-                        onPressed: () => ref.invalidate(propertiesProvider),
-                        child: const Text('Retry loading properties'),
-                      ),
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          children: [
-                            if (properties.asData != null)
-                              DropdownButtonFormField<String>(
-                                initialValue: propertyId,
-                                decoration: const InputDecoration(
-                                  labelText: 'Property',
-                                ),
-                                items: [
-                                  for (final p in properties.asData!.value)
-                                    DropdownMenuItem(
-                                      value: p.id,
-                                      child: Text(p.name),
-                                    ),
-                                ],
-                                onChanged: (id) {
-                                  setState(() {
-                                    propertyId = id;
-                                    allocationLabel = null;
-                                    roomId = null;
-                                    bedId = null;
-                                  });
-                                },
-                              ),
-                            const SizedBox(height: 12),
-                            ListTile(
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                side: BorderSide(
-                                  color: Theme.of(context).dividerColor,
-                                ),
-                              ),
-                              title: const Text('Room / Bed'),
-                              subtitle: Text(
-                                allocationLabel ??
-                                    (roomId == null
-                                        ? 'Select a room and bed'
-                                        : 'Room selected'),
-                              ),
-                              trailing: const Icon(Icons.keyboard_arrow_down),
-                              onTap: selectRoom,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                ListView(
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          children: [
-                            _dropdown('Stay Type', stayType, const {
-                              'LONG_TERM': 'Long-Term',
-                              'SHORT_TERM': 'Short-Term',
-                            }, (v) => setState(() => stayType = v)),
-                            ListTile(
-                              title: const Text('Move-in Date'),
-                              subtitle: Text(date(moveIn)),
-                              trailing: const Icon(Icons.calendar_month),
-                              onTap: () async {
-                                final d = await pickDate(moveIn);
-                                if (d != null) setState(() => moveIn = d);
-                              },
-                            ),
-                            ListTile(
-                              title: const Text('Move-out Date'),
-                              subtitle: Text(date(moveOut)),
-                              trailing: const Icon(Icons.calendar_month),
-                              onTap: () async {
-                                final d = await pickDate(moveOut);
-                                if (d != null) setState(() => moveOut = d);
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          children: [
-                            PgField(
-                              'Lock-in Period (months)',
-                              controller: lockMonths,
-                              keyboardType: TextInputType.number,
-                            ),
-                            PgField(
-                              'Notice Period (days)',
-                              controller: noticeDays,
-                              keyboardType: TextInputType.number,
-                            ),
-                            PgField(
-                              'Agreement Period (months)',
-                              controller: agreementMonths,
-                              keyboardType: TextInputType.number,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          children: [
-                            PgField(
-                              'Rent Due Date (1–28)',
-                              controller: dueDay,
-                              keyboardType: TextInputType.number,
-                            ),
-                            PgField(
-                              'Fixed Rent (₹)',
-                              controller: rent,
-                              keyboardType: TextInputType.number,
-                            ),
-                            PgField(
-                              'Security Deposit (₹)',
-                              controller: deposit,
-                              keyboardType: TextInputType.number,
-                            ),
-                            _dropdown('Tenant Type', tenantType, const {
-                              'STUDENT': 'Student',
-                              'PROFESSIONAL': 'Professional',
-                              'BACHELOR': 'Bachelor',
-                              'FAMILY': 'Family',
-                              'COUPLE': 'Couple',
-                              'STAFF': 'Staff',
-                              'OTHER': 'Others',
-                            }, (v) => setState(() => tenantType = v)),
-                            PgField(
-                              'Remarks',
-                              controller: remarks,
-                              maxLines: 3,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                ListView(
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    Text(
-                      'Opening Balance',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Add existing dues and collections for this tenant.',
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
+                    Column(
+                      key: sections[0],
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: entries.length >= 20
-                                ? null
-                                : () => editOpening(),
-                            icon: const Icon(Icons.add),
-                            label: const Text('Add Due'),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          child: Text(
+                            'Tenant details',
+                            style: Theme.of(context).textTheme.titleLarge,
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: entries.length >= 20
-                                ? null
-                                : () => editOpening(collection: true),
-                            icon: const Icon(Icons.add),
-                            label: const Text('Add Collection'),
+                        Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              children: [
+                                PgField('Name', controller: first),
+                                PgField('Last Name', controller: last),
+                                PgField(
+                                  'Phone Number',
+                                  controller: phone,
+                                  keyboardType: TextInputType.phone,
+                                ),
+                                PgField(
+                                  'Alternate Phone Number',
+                                  controller: alternate,
+                                  keyboardType: TextInputType.phone,
+                                ),
+                                PgField('Parent name', controller: parentName),
+                                PgField(
+                                  'Parent phone',
+                                  controller: parentPhone,
+                                  keyboardType: TextInputType.phone,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        SwitchListTile(
+                          value: whatsapp,
+                          onChanged: (v) => setState(() => whatsapp = v),
+                          title: const Text('Send WhatsApp Reminder'),
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                        if (properties.isLoading)
+                          const TenantSkeleton(TenantPlaceholder.fields),
+                        if (properties.hasError)
+                          TextButton(
+                            onPressed: () => ref.invalidate(propertiesProvider),
+                            child: const Text('Retry loading properties'),
+                          ),
+                        Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              children: [
+                                if (properties.asData != null)
+                                  DropdownButtonFormField<String>(
+                                    initialValue:
+                                        properties.asData!.value.any(
+                                          (p) => p.id == propertyId,
+                                        )
+                                        ? propertyId
+                                        : null,
+                                    isExpanded: true,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Property',
+                                    ),
+                                    items: [
+                                      for (final p in properties.asData!.value)
+                                        DropdownMenuItem(
+                                          value: p.id,
+                                          child: Text(p.name),
+                                        ),
+                                    ],
+                                    onChanged: (id) {
+                                      setState(() {
+                                        propertyId = id;
+                                        allocationLabel = null;
+                                        roomId = null;
+                                        bedId = null;
+                                      });
+                                    },
+                                  ),
+                                const SizedBox(height: 12),
+                                ListTile(
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    side: BorderSide(
+                                      color: Theme.of(context).dividerColor,
+                                    ),
+                                  ),
+                                  title: const Text('Room / Bed'),
+                                  subtitle: Text(
+                                    allocationLabel ??
+                                        (roomId == null
+                                            ? 'Select a room and bed'
+                                            : 'Room selected'),
+                                  ),
+                                  trailing: const Icon(
+                                    Icons.keyboard_arrow_down,
+                                  ),
+                                  onTap: selectRoom,
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
-                    for (final e in entries)
-                      Dismissible(
-                        key: ObjectKey(e),
-                        direction: DismissDirection.startToEnd,
-                        background: const ColoredBox(
-                          color: Colors.red,
-                          child: Align(
-                            alignment: Alignment.centerLeft,
-                            child: Padding(
-                              padding: EdgeInsets.all(16),
-                              child: Icon(Icons.delete, color: Colors.white),
+                    Column(
+                      key: sections[1],
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          child: Text(
+                            'Stay details',
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                        ),
+                        Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              children: [
+                                _dropdown('Stay Type', stayType, const {
+                                  'LONG_TERM': 'Long-Term',
+                                  'SHORT_TERM': 'Short-Term',
+                                }, (v) => setState(() => stayType = v)),
+                                ListTile(
+                                  title: const Text('Move-in Date'),
+                                  subtitle: Text(date(moveIn)),
+                                  trailing: const Icon(Icons.calendar_month),
+                                  onTap: () async {
+                                    final d = await pickDate(moveIn);
+                                    if (d != null && mounted) {
+                                      setState(() => moveIn = d);
+                                    }
+                                  },
+                                ),
+                                ListTile(
+                                  title: const Text('Move-out Date'),
+                                  subtitle: Text(date(moveOut)),
+                                  trailing: const Icon(Icons.calendar_month),
+                                  onTap: () async {
+                                    final d = await pickDate(moveOut);
+                                    if (d != null && mounted) {
+                                      setState(() => moveOut = d);
+                                    }
+                                  },
+                                ),
+                              ],
                             ),
                           ),
                         ),
-                        onDismissed: (_) => setState(() => entries.remove(e)),
-                        child: Card(
-                          child: ListTile(
-                            title: Text(
-                              e.amount > 0
-                                  ? 'Due · ${rupees(e.amount)}'
-                                  : 'Collection · ${rupees(e.collectedAmount)}',
-                            ),
-                            subtitle: Text(
-                              '${date(e.dueDate)}${e.description.isEmpty ? '' : ' · ${e.description}'}',
-                            ),
-                            trailing: const Icon(Icons.edit_outlined),
-                            onTap: () => editOpening(
-                              existing: e,
-                              collection: e.amount == 0,
+                        const SizedBox(height: 12),
+                        Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              children: [
+                                PgField(
+                                  'Lock-in Period (months)',
+                                  controller: lockMonths,
+                                  keyboardType: TextInputType.number,
+                                ),
+                                PgField(
+                                  'Notice Period (days)',
+                                  controller: noticeDays,
+                                  keyboardType: TextInputType.number,
+                                ),
+                                PgField(
+                                  'Agreement Period (months)',
+                                  controller: agreementMonths,
+                                  keyboardType: TextInputType.number,
+                                ),
+                              ],
                             ),
                           ),
                         ),
-                      ),
+                        const SizedBox(height: 12),
+                        Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              children: [
+                                PgField(
+                                  'Rent Due Date (1–28)',
+                                  controller: dueDay,
+                                  keyboardType: TextInputType.number,
+                                ),
+                                _dropdown(
+                                  'Rental frequency',
+                                  frequency,
+                                  frequencies,
+                                  (value) => setState(() => frequency = value),
+                                ),
+                                PgField(
+                                  'Fixed rent per month (₹)',
+                                  controller: rent,
+                                  keyboardType: TextInputType.number,
+                                ),
+                                PgField(
+                                  'Security Deposit (₹)',
+                                  controller: deposit,
+                                  keyboardType: TextInputType.number,
+                                ),
+                                _dropdown('Tenant Type', tenantType, const {
+                                  'STUDENT': 'Student',
+                                  'PROFESSIONAL': 'Professional',
+                                  'BACHELOR': 'Bachelor',
+                                  'FAMILY': 'Family',
+                                  'COUPLE': 'Couple',
+                                  'STAFF': 'Staff',
+                                  'OTHER': 'Others',
+                                }, (v) => setState(() => tenantType = v)),
+                                PgField(
+                                  'Remarks',
+                                  controller: remarks,
+                                  maxLines: 3,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    Column(
+                      key: sections[2],
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          child: Text(
+                            'Payment details',
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                        ),
+                        Text(
+                          'Opening balance',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Add existing dues and collections for this tenant.',
+                        ),
+                        const SizedBox(height: 16),
+                        ListenableBuilder(
+                          listenable: Listenable.merge([rent, deposit, dueDay]),
+                          builder: (context, _) {
+                            final rentAmount =
+                                (tryParseRupees(rent.text) ?? 0) *
+                                int.parse(frequency);
+                            final depositAmount =
+                                tryParseRupees(deposit.text) ?? 0;
+                            final billingDay = (int.tryParse(dueDay.text) ?? 1)
+                                .clamp(1, 28);
+                            final firstRentDue = DateTime(
+                              moveIn.year,
+                              moveIn.month,
+                              billingDay > moveIn.day ? billingDay : moveIn.day,
+                            );
+                            return Column(
+                              children: [
+                                if (rentAmount > 0)
+                                  _automaticDue(
+                                    'Opening rent',
+                                    rentAmount,
+                                    firstRentDue,
+                                    includeOpeningRent
+                                        ? () => setState(
+                                            () => includeOpeningRent = false,
+                                          )
+                                        : null,
+                                    restore: includeOpeningRent
+                                        ? null
+                                        : () => setState(
+                                            () => includeOpeningRent = true,
+                                          ),
+                                  ),
+                                if (depositAmount > 0)
+                                  _automaticDue(
+                                    'Security deposit',
+                                    depositAmount,
+                                    moveIn,
+                                    () => deposit.text = '0',
+                                  ),
+                              ],
+                            );
+                          },
+                        ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: entries.length >= 20
+                                    ? null
+                                    : () => editOpening(),
+                                icon: const Icon(Icons.add),
+                                label: const Text('Add Due'),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: entries.length >= 20
+                                    ? null
+                                    : () => editOpening(collection: true),
+                                icon: const Icon(Icons.add),
+                                label: const Text('Add Collection'),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        for (final e in entries)
+                          Dismissible(
+                            key: ObjectKey(e),
+                            direction: DismissDirection.startToEnd,
+                            background: const ColoredBox(
+                              color: Colors.red,
+                              child: Align(
+                                alignment: Alignment.centerLeft,
+                                child: Padding(
+                                  padding: EdgeInsets.all(16),
+                                  child: Icon(
+                                    Icons.delete,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            onDismissed: (_) =>
+                                setState(() => entries.remove(e)),
+                            child: Card(
+                              child: ListTile(
+                                title: Text(
+                                  e.amount > 0
+                                      ? 'Due · ${rupees(e.amount)}'
+                                      : 'Collection · ${rupees(e.collectedAmount)}',
+                                ),
+                                subtitle: Text(
+                                  '${date(e.dueDate)}${e.description.isEmpty ? '' : ' · ${e.description}'}',
+                                ),
+                                trailing: PopupMenuButton<String>(
+                                  tooltip: 'Payment entry actions',
+                                  onSelected: (action) {
+                                    if (action == 'edit') {
+                                      editOpening(
+                                        existing: e,
+                                        collection: e.amount == 0,
+                                      );
+                                    } else {
+                                      setState(() => entries.remove(e));
+                                    }
+                                  },
+                                  itemBuilder: (_) => const [
+                                    PopupMenuItem(
+                                      value: 'edit',
+                                      child: Text('Edit'),
+                                    ),
+                                    PopupMenuItem(
+                                      value: 'delete',
+                                      child: Text('Delete'),
+                                    ),
+                                  ],
+                                ),
+                                onTap: () => editOpening(
+                                  existing: e,
+                                  collection: e.amount == 0,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
                   ],
                 ),
-              ],
+              ),
             ),
           ),
           SafeArea(
@@ -808,6 +989,40 @@ class _AddTenantState extends ConsumerState<AddTenantScreen>
       ),
     );
   }
+
+  Widget _automaticDue(
+    String label,
+    int amount,
+    DateTime dueAt,
+    VoidCallback? remove, {
+    VoidCallback? restore,
+  }) => Card(
+    child: ListTile(
+      title: Text(label),
+      subtitle: Text(
+        restore == null
+            ? '${rupees(amount)} · Due ${date(dueAt)}'
+            : 'Skipped at check-in',
+      ),
+      onTap: restore ?? () => showSection(1),
+      trailing: restore != null
+          ? TextButton(onPressed: restore, child: const Text('Restore'))
+          : PopupMenuButton<String>(
+              tooltip: '$label actions',
+              onSelected: (action) {
+                if (action == 'edit') {
+                  showSection(1);
+                } else {
+                  remove?.call();
+                }
+              },
+              itemBuilder: (_) => const [
+                PopupMenuItem(value: 'edit', child: Text('Edit')),
+                PopupMenuItem(value: 'delete', child: Text('Delete')),
+              ],
+            ),
+    ),
+  );
 
   Widget _dropdown(
     String title,

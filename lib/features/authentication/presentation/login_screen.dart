@@ -43,6 +43,8 @@ class _LoginState extends ConsumerState<LoginScreen> {
         await auth.login(email.text.trim(), password.text);
       }
       ref.invalidate(sessionProvider);
+      await ref.read(sessionProvider.future);
+      if (!mounted) return;
       ref.invalidate(propertiesProvider);
       ref.invalidate(roomsProvider);
       ref.invalidate(residentsProvider);

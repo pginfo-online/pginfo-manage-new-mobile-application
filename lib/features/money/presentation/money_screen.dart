@@ -21,13 +21,10 @@ class MoneyScreen extends StatelessWidget {
   Widget build(BuildContext context) => DefaultTabController(
     length: 6,
     child: Scaffold(
-      appBar: AppBar(
-        title: const Text('Money'),
-        bottom: const TabBar(
+      appBar: const PgHeader(
+        showProperty: true,
+        bottom: TabBar(
           isScrollable: true,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
-          indicatorColor: Colors.white,
           tabAlignment: TabAlignment.start,
           tabs: [
             Tab(text: 'Due Packages'),
@@ -358,49 +355,77 @@ class _MoneyTabState extends ConsumerState<MoneyTab>
       ],
     ),
   );
-  Widget bankCard(MoneyRow row) => PgCard(
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: const CircleAvatar(
-            child: Icon(Icons.account_balance_outlined),
+  Widget bankCard(MoneyRow row) {
+    final metadata = row['metadata'];
+    final canVerify = metadata is Map && metadata['routeProductId'] is String;
+    final status = canVerify
+        ? "${row['status']} · KYC ${row['kycStatus']}"
+        : 'Verification required';
+    return PgCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const CircleAvatar(
+              child: Icon(Icons.account_balance_outlined),
+            ),
+            title: Text('${row['beneficiaryName'] ?? row['businessName']}'),
+            subtitle: Text(
+              '${row['accountNumberMasked']} · ${row['ifscCode']}\n$status',
+            ),
           ),
-          title: Text('${row['beneficiaryName'] ?? row['businessName']}'),
-          subtitle: Text(
-            '${row['accountNumberMasked']} · ${row['ifscCode']}\n${row['status']} · KYC ${row['kycStatus']}',
+          if (canVerify)
+            TextButton.icon(
+              onPressed: () async {
+                try {
+                  await ref
+                      .read(apiClientProvider)
+                      .post('/payouts/accounts/${row['id']}/refresh', {});
+                  if (mounted) refreshMoney(ref);
+                } catch (e) {
+                  if (mounted) showError(context, e);
+                }
+              },
+              icon: const Icon(Icons.refresh),
+              label: const Text('Check Razorpay verification'),
+            )
+          else
+            const Text(
+              'Legacy entry · add the bank account through Razorpay Route to verify it.',
+            ),
+          Text(
+            'Property: ${row['property']?['name'] ?? 'Organization default'}',
           ),
-        ),
-        Text('Property: ${row['property']?['name'] ?? 'Organization default'}'),
-        TextButton.icon(
-          onPressed: () async {
-            final picked = await Navigator.push<MoneyRow>(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const MoneyPropertyScreen(allowUnlink: true),
-              ),
-            );
-            final selected = picked?['id'] as String?;
-            if (selected == null) return;
-            try {
-              await ref.read(apiClientProvider).patch(
-                '/money/banks/${row['id']}/property',
-                {'propertyId': selected.isEmpty ? null : selected},
+          TextButton.icon(
+            onPressed: () async {
+              final picked = await Navigator.push<MoneyRow>(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const MoneyPropertyScreen(allowUnlink: true),
+                ),
               );
-              if (mounted) refreshMoney(ref);
-            } catch (e) {
-              if (mounted) {
-                showError(context, e);
+              final selected = picked?['id'] as String?;
+              if (selected == null) return;
+              try {
+                await ref.read(apiClientProvider).patch(
+                  '/money/banks/${row['id']}/property',
+                  {'propertyId': selected.isEmpty ? null : selected},
+                );
+                if (mounted) refreshMoney(ref);
+              } catch (e) {
+                if (mounted) {
+                  showError(context, e);
+                }
               }
-            }
-          },
-          icon: const Icon(Icons.link),
-          label: const Text('Link a Property'),
-        ),
-      ],
-    ),
-  );
+            },
+            icon: const Icon(Icons.link),
+            label: const Text('Link a Property'),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 IconData moneyExpenseIcon(String name) => switch (name.toLowerCase()) {

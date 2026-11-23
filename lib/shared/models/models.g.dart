@@ -98,6 +98,7 @@ _Bed _$BedFromJson(Map<String, dynamic> json) => _Bed(
   id: json['id'] as String,
   bedNumber: json['bedNumber'] as String,
   status: json['status'] as String,
+  isDisabledForRent: json['isDisabledForRent'] as bool? ?? false,
   residents:
       (json['residents'] as List<dynamic>?)
           ?.map((e) => Resident.fromJson(e as Map<String, dynamic>))
@@ -109,6 +110,7 @@ Map<String, dynamic> _$BedToJson(_Bed instance) => <String, dynamic>{
   'id': instance.id,
   'bedNumber': instance.bedNumber,
   'status': instance.status,
+  'isDisabledForRent': instance.isDisabledForRent,
   'residents': instance.residents,
 };
 
@@ -127,6 +129,7 @@ _Resident _$ResidentFromJson(Map<String, dynamic> json) => _Resident(
   agreementUrl: json['agreementUrl'] as String?,
   profession: json['profession'] as String?,
   monthlyRent: (json['monthlyRent'] as num).toInt(),
+  rentalFrequencyMonths: (json['rentalFrequencyMonths'] as num?)?.toInt() ?? 1,
   securityDeposit: (json['securityDeposit'] as num?)?.toInt() ?? 0,
   rentDueDay: (json['rentDueDay'] as num?)?.toInt(),
   propertyId: json['propertyId'] as String?,
@@ -165,6 +168,7 @@ Map<String, dynamic> _$ResidentToJson(_Resident instance) => <String, dynamic>{
   'agreementUrl': instance.agreementUrl,
   'profession': instance.profession,
   'monthlyRent': instance.monthlyRent,
+  'rentalFrequencyMonths': instance.rentalFrequencyMonths,
   'securityDeposit': instance.securityDeposit,
   'rentDueDay': instance.rentDueDay,
   'propertyId': instance.propertyId,

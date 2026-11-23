@@ -97,7 +97,7 @@ void main() {
       expect(find.textContaining('Bed A'), findsOneWidget);
       await tester.tap(find.text('Payment\nDetails'));
       await tester.pumpAndSettle();
-      expect(find.text('Opening Balance'), findsOneWidget);
+      expect(find.text('Opening balance'), findsOneWidget);
     },
   );
 }

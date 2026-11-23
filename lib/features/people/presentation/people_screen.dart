@@ -28,8 +28,8 @@ class _PeopleState extends ConsumerState<PeopleScreen>
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      title: const Text('People'),
+    appBar: PgHeader(
+      showProperty: true,
       bottom: TabBar(
         controller: tabs,
         tabs: const [
@@ -456,6 +456,7 @@ class _LeadsState extends ConsumerState<_LeadsTab> {
             const SizedBox(height: 8),
             PgAsync(
               value: ref.watch(leadStatsProvider),
+              placeholder: const TenantSkeleton(TenantPlaceholder.fields),
               retry: () => ref.invalidate(leadStatsProvider),
               data: (stats) {
                 final byStatus = stats['byStatus'] as Map? ?? const {};
@@ -487,6 +488,7 @@ class _LeadsState extends ConsumerState<_LeadsTab> {
             ),
             PgAsync(
               value: ref.watch(pagedListProvider(query)),
+              placeholder: const TenantSkeleton(TenantPlaceholder.cards),
               retry: () => ref.invalidate(pagedListProvider(query)),
               data: (items) => Column(
                 children: [
@@ -584,6 +586,7 @@ class _TeamState extends ConsumerState<_TeamTab> {
         else
           PgAsync(
             value: ref.watch(membersProvider(orgId)),
+            placeholder: const TenantSkeleton(TenantPlaceholder.cards),
             retry: () => ref.invalidate(membersProvider(orgId)),
             data: (members) => Column(
               children: [
@@ -675,6 +678,7 @@ class _TeamState extends ConsumerState<_TeamTab> {
         ),
         PgAsync(
           value: ref.watch(pagedListProvider(staffQuery)),
+          placeholder: const TenantSkeleton(TenantPlaceholder.cards),
           retry: () => ref.invalidate(pagedListProvider(staffQuery)),
           data: (staffMembers) => Column(
             children: [

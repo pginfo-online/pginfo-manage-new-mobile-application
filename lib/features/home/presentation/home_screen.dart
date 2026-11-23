@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/di/providers.dart';
+import '../../../core/network/api_client.dart';
 import '../../../shared/components/common.dart';
 import '../../../shared/models/models.dart';
 
@@ -14,42 +15,66 @@ class HomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final metrics = ref.watch(dashboardProvider);
     final selected = ref.watch(selectedPropertyProvider);
+    var drag = 0.0;
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: PgHeader(
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(68),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+            child: FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: scheme.surface,
+                foregroundColor: scheme.onSurface,
+                alignment: Alignment.centerLeft,
+                minimumSize: const Size.fromHeight(52),
+              ),
+              onPressed: () => context.push('/search'),
+              icon: const Icon(Icons.search),
+              label: const Text('Search anything'),
+            ),
+          ),
+        ),
         actions: [
           IconButton(
+            tooltip: 'Profile and settings',
             onPressed: () => context.push('/profile'),
             icon: const Icon(Icons.person_outline),
           ),
           IconButton(
+            tooltip: 'Notifications',
             onPressed: () => context.push('/action/notifications'),
             icon: const Icon(Icons.notifications_none),
           ),
         ],
       ),
       body: GestureDetector(
+        onHorizontalDragStart: (_) => drag = 0,
+        onHorizontalDragUpdate: (details) => drag += details.primaryDelta ?? 0,
         onHorizontalDragEnd: (details) {
-          if ((details.primaryVelocity ?? 0) > 550) context.push('/profile');
+          final velocity = details.primaryVelocity ?? 0;
+          if (drag > 60 || (drag > 16 && velocity > 250)) {
+            context.push('/properties/select');
+          } else if (drag < -60 || (drag < -16 && velocity < -250)) {
+            context.push('/profile');
+          }
         },
         child: RefreshIndicator(
           onRefresh: () async {
-            ref.invalidate(dashboardProvider);
-            await ref.read(dashboardProvider.future);
+            try {
+              ref.invalidate(dashboardProvider);
+              await ref.read(dashboardProvider.future);
+            } catch (error) {
+              if (context.mounted && ref.read(dashboardProvider).hasValue) {
+                showError(context, error);
+              }
+            }
           },
           child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.all(16),
             children: [
-              SearchField(
-                hint: 'Search anything',
-                trailing: IconButton(
-                  onPressed: () => context.push('/search'),
-                  icon: const Icon(Icons.arrow_forward),
-                ),
-                onChanged: (v) {
-                  if (v.isNotEmpty) context.push('/search');
-                },
-              ),
-              const SizedBox(height: 20),
               Text(
                 'Overview',
                 style: Theme.of(context).textTheme.titleMedium
@@ -58,6 +83,7 @@ class HomeScreen extends ConsumerWidget {
               const SizedBox(height: 8),
               PgAsync(
                 value: metrics,
+                placeholder: const _OverviewSkeleton(),
                 retry: () => ref.invalidate(dashboardProvider),
                 data: (data) {
                   final financial = data['financial'] as Map<String, dynamic>;
@@ -162,6 +188,18 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
+class _OverviewSkeleton extends StatelessWidget {
+  const _OverviewSkeleton();
+
+  @override
+  Widget build(BuildContext context) => const Row(
+    children: [
+      Expanded(child: PgCard(child: PgSkeleton(height: 66))),
+      Expanded(child: PgCard(child: PgSkeleton(height: 66))),
+    ],
+  );
+}
+
 class _QuickAction extends StatelessWidget {
   const _QuickAction(this.label, this.icon, this.path);
   final String label, path;
@@ -175,8 +213,11 @@ class _QuickAction extends StatelessWidget {
         children: [
           CircleAvatar(
             radius: 25,
-            backgroundColor: const Color(0xffe4eaff),
-            child: Icon(icon, color: const Color(0xff3156f5)),
+            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+            child: Icon(
+              icon,
+              color: Theme.of(context).colorScheme.onPrimaryContainer,
+            ),
           ),
           const SizedBox(height: 5),
           Text(
@@ -217,7 +258,6 @@ class ProfileScreen extends ConsumerWidget {
           title: const Text('Sign out'),
           onTap: () async {
             await ref.read(authRepositoryProvider).logout();
-            ref.read(selectedPropertyProvider.notifier).select(null);
             ref.read(selectedOrganizationProvider.notifier).select(null);
             ref.invalidate(sessionProvider);
             ref.invalidate(propertiesProvider);
@@ -228,7 +268,6 @@ class ProfileScreen extends ConsumerWidget {
             ref.invalidate(tenantLedgerProvider);
             ref.invalidate(membersProvider);
             ref.invalidate(organizationsProvider);
-            if (context.mounted) context.go('/login');
           },
         ),
       ],
@@ -257,7 +296,9 @@ class OrganizationSelectScreen extends ConsumerWidget {
                   ref
                       .read(selectedOrganizationProvider.notifier)
                       .select(org['id'] as String);
-                  ref.read(selectedPropertyProvider.notifier).select(null);
+                  ref.invalidate(sessionProvider);
+                  await ref.read(sessionProvider.future);
+                  ref.invalidate(apiClientProvider);
                   ref.invalidate(propertiesProvider);
                   ref.invalidate(roomsProvider);
                   ref.invalidate(residentsProvider);
@@ -305,6 +346,7 @@ class _GlobalSearchState extends ConsumerState<GlobalSearchScreen> {
       children: [
         SearchField(
           hint: 'Search across PgInfo',
+          autofocus: true,
           onChanged: (v) {
             debounce?.cancel();
             debounce = Timer(const Duration(milliseconds: 300), () {
@@ -338,41 +380,53 @@ class _GlobalSearchState extends ConsumerState<GlobalSearchScreen> {
         ] else
           PgAsync(
             value: ref.watch(globalSearchProvider(query)),
-            data: (results) => Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            retry: () => ref.invalidate(globalSearchProvider(query)),
+            placeholder: const Column(
               children: [
-                for (final entry in results.entries)
-                  if (entry.value.isNotEmpty) ...[
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Text(
-                        entry.key,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                    ),
-                    for (final item in entry.value)
-                      ListTile(
-                        title: Text(
-                          '${item['name'] ?? item['firstName'] ?? item['description'] ?? 'Result'}',
-                        ),
-                        subtitle: Text(
-                          '${item['mobile'] ?? item['status'] ?? ''}',
-                        ),
-                        trailing: const Icon(Icons.chevron_right),
-                        onTap: () {
-                          final id = item['id'];
-                          if (entry.key == 'Tenants') {
-                            context.push('/tenants/$id');
-                          } else if (entry.key == 'Rooms') {
-                            context.push('/rooms/$id');
-                          } else {
-                            context.push('/action/${entry.key.toLowerCase()}');
-                          }
-                        },
-                      ),
-                  ],
+                PgCard(child: PgSkeleton(height: 42)),
+                PgCard(child: PgSkeleton(height: 42)),
+                PgCard(child: PgSkeleton(height: 42)),
               ],
             ),
+            data: (results) => results.values.every((items) => items.isEmpty)
+                ? const ListTile(title: Text('No results found'))
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (final entry in results.entries)
+                        if (entry.value.isNotEmpty) ...[
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            child: Text(
+                              entry.key,
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                          ),
+                          for (final item in entry.value)
+                            ListTile(
+                              title: Text(
+                                '${item['name'] ?? item['firstName'] ?? item['description'] ?? 'Result'}',
+                              ),
+                              subtitle: Text(
+                                '${item['mobile'] ?? item['status'] ?? ''}',
+                              ),
+                              trailing: const Icon(Icons.chevron_right),
+                              onTap: () {
+                                final id = item['id'];
+                                if (entry.key == 'Tenants') {
+                                  context.push('/tenants/$id');
+                                } else if (entry.key == 'Rooms') {
+                                  context.push('/rooms/$id');
+                                } else {
+                                  context.push(
+                                    '/action/${entry.key.toLowerCase()}',
+                                  );
+                                }
+                              },
+                            ),
+                        ],
+                    ],
+                  ),
           ),
       ],
     ),

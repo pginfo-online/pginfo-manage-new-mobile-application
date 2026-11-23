@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../core/design_system/theme.dart';
 import 'di/providers.dart';
+import '../shared/components/common.dart';
 import '../features/authentication/presentation/login_screen.dart';
 import '../features/home/presentation/home_screen.dart';
 import '../features/property/presentation/property_screens.dart';
@@ -18,10 +19,14 @@ import '../features/all/presentation/all_screen.dart';
 import '../features/all/presentation/action_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
-  final session = ref.watch(sessionProvider).asData?.value;
-  return GoRouter(
-    initialLocation: session == null ? '/login' : '/home',
+  final refresh = ValueNotifier(0);
+  ref.onDispose(refresh.dispose);
+  ref.listen(sessionProvider, (_, _) => refresh.value++);
+  final router = GoRouter(
+    initialLocation: '/home',
+    refreshListenable: refresh,
     redirect: (context, state) {
+      final session = ref.read(sessionProvider).value;
       if (session == null && state.uri.path != '/login') return '/login';
       if (session != null && state.uri.path == '/login') return '/home';
       return null;
@@ -136,6 +141,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
     ],
   );
+  ref.onDispose(router.dispose);
+  return router;
 });
 
 class PgInfoApp extends ConsumerWidget {
@@ -143,10 +150,20 @@ class PgInfoApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(sessionProvider);
-    if (session.isLoading) {
+    if ((!session.hasValue && session.isLoading) || session.hasError) {
       return MaterialApp(
         theme: PgTheme.build(Brightness.light),
-        home: const Scaffold(body: Center(child: CircularProgressIndicator())),
+        darkTheme: PgTheme.build(Brightness.dark),
+        home: Scaffold(
+          body: Center(
+            child: session.hasError
+                ? FilledButton(
+                    onPressed: () => ref.invalidate(sessionProvider),
+                    child: const Text('Retry opening PgInfo'),
+                  )
+                : const PgLogo(size: 94),
+          ),
+        ),
       );
     }
     return MaterialApp.router(

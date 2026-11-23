@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -83,17 +85,54 @@ class FakeGenericPagedRepository extends FakeRepository {
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  setUp(
+    () => FlutterSecureStorage.setMockInitialValues({
+      'accessToken': tokenFor('org-a'),
+    }),
+  );
+
+  test(
+    'restores the selected property scoped to the signed-in organization',
+    () async {
+      var container = ProviderContainer();
+      await container.read(sessionProvider.future);
+      await container
+          .read(selectedPropertyProvider.notifier)
+          .select('property-a');
+      container.dispose();
+
+      container = ProviderContainer();
+      addTearDown(container.dispose);
+      await container.read(sessionProvider.future);
+      expect(container.read(selectedPropertyProvider), 'property-a');
+
+      await const FlutterSecureStorage().write(
+        key: 'accessToken',
+        value: tokenFor('org-b'),
+      );
+      container.invalidate(sessionProvider);
+      await container.read(sessionProvider.future);
+      expect(container.read(selectedPropertyProvider), isNull);
+    },
+  );
+
   test('changing property refetches scoped room data', () async {
     final container = ProviderContainer(
       overrides: [repositoryProvider.overrideWithValue(FakeRepository())],
     );
     addTearDown(container.dispose);
-    container.read(selectedPropertyProvider.notifier).select('property-a');
+    await container.read(sessionProvider.future);
+    await container
+        .read(selectedPropertyProvider.notifier)
+        .select('property-a');
     expect(
       (await container.read(roomsProvider.future)).single.id,
       'property-a',
     );
-    container.read(selectedPropertyProvider.notifier).select('property-b');
+    await container
+        .read(selectedPropertyProvider.notifier)
+        .select('property-b');
     expect(
       (await container.read(roomsProvider.future)).single.id,
       'property-b',
@@ -104,11 +143,16 @@ void main() {
       overrides: [repositoryProvider.overrideWithValue(FakePagedRepository())],
     );
     addTearDown(container.dispose);
-    container.read(selectedPropertyProvider.notifier).select('property-a');
+    await container.read(sessionProvider.future);
+    await container
+        .read(selectedPropertyProvider.notifier)
+        .select('property-a');
     expect((await container.read(residentsProvider.future)).length, 20);
     await container.read(residentsProvider.notifier).loadMore();
     expect(container.read(residentsProvider).asData!.value.length, 21);
-    container.read(selectedPropertyProvider.notifier).select('property-b');
+    await container
+        .read(selectedPropertyProvider.notifier)
+        .select('property-b');
     expect((await container.read(residentsProvider.future)).single.id, 'b-1');
   });
   test(
@@ -148,4 +192,11 @@ void main() {
       expect(repository.requests.last, containsPair('page', 2));
     },
   );
+}
+
+String tokenFor(String orgId) {
+  final payload = base64Url.encode(
+    utf8.encode(jsonEncode({'sub': 'user-a', 'orgId': orgId})),
+  );
+  return 'header.$payload.signature';
 }

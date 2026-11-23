@@ -5,42 +5,123 @@ import 'package:go_router/go_router.dart';
 import '../../app/di/providers.dart';
 import '../../core/design_system/theme.dart';
 
+class PgLogo extends StatelessWidget {
+  const PgLogo({super.key, this.size = 38});
+  final double size;
+
+  @override
+  Widget build(BuildContext context) => ClipOval(
+    child: Image.asset(
+      'ui/ref.png',
+      width: size,
+      height: size,
+      semanticLabel: 'PgInfo',
+      cacheWidth: (size * 3).round(),
+    ),
+  );
+}
+
 class PgHeader extends ConsumerWidget implements PreferredSizeWidget {
-  const PgHeader({super.key, this.title, this.actions = const []});
+  const PgHeader({
+    super.key,
+    this.title,
+    this.actions = const [],
+    this.bottom,
+    this.showProperty = false,
+  });
   final String? title;
   final List<Widget> actions;
+  final PreferredSizeWidget? bottom;
+  final bool showProperty;
+
   @override
-  Size get preferredSize => const Size.fromHeight(62);
+  Size get preferredSize =>
+      Size.fromHeight(62 + (bottom?.preferredSize.height ?? 0));
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final props = ref.watch(propertiesProvider).asData?.value ?? [];
-    final selected = ref.watch(selectedPropertyProvider);
-    final name =
-        title ??
-        props.where((p) => p.id == selected).firstOrNull?.name ??
-        'Select property';
+    final theme = Theme.of(context);
+    final propertyHeader = title == null || showProperty;
+    final properties = propertyHeader
+        ? ref.watch(propertiesProvider).value
+        : null;
+    final selected = propertyHeader
+        ? ref.watch(selectedPropertyProvider)
+        : null;
+    final name = properties?.where((p) => p.id == selected).firstOrNull?.name;
+    final foreground = theme.brightness == Brightness.dark
+        ? theme.colorScheme.onSurface
+        : Colors.white;
     return AppBar(
       toolbarHeight: 62,
-      title: title == null
-          ? InkWell(
-              onTap: () => context.push('/properties/select'),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const CircleAvatar(
-                    backgroundColor: Colors.white,
-                    child: Icon(Icons.apartment, color: PgTheme.blue),
+      centerTitle: false,
+      backgroundColor: theme.brightness == Brightness.dark
+          ? PgTheme.darkHeader
+          : PgTheme.blue,
+      foregroundColor: foreground,
+      scrolledUnderElevation: 0,
+      title: propertyHeader
+          ? Row(
+              children: [
+                const PgLogo(),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: TextButton(
+                    style: TextButton.styleFrom(foregroundColor: foreground),
+                    onPressed: () => context.push('/properties/select'),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            name ?? 'Select property',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const Icon(Icons.keyboard_arrow_down),
+                      ],
+                    ),
                   ),
-                  const SizedBox(width: 8),
-                  Flexible(child: Text(name, overflow: TextOverflow.ellipsis)),
-                  const Icon(Icons.keyboard_arrow_down),
-                ],
-              ),
+                ),
+              ],
             )
-          : Text(name),
+          : Text(title!),
       actions: actions,
+      bottom: bottom == null
+          ? null
+          : PreferredSize(
+              preferredSize: bottom!.preferredSize,
+              child: TabBarTheme(
+                data: TabBarThemeData(
+                  labelColor: foreground,
+                  unselectedLabelColor: foreground.withValues(alpha: .82),
+                  indicatorColor: foreground,
+                  dividerColor: foreground.withValues(alpha: .18),
+                ),
+                child: bottom!,
+              ),
+            ),
     );
   }
+}
+
+class PgSkeleton extends StatelessWidget {
+  const PgSkeleton({super.key, required this.height, this.width});
+  final double height;
+  final double? width;
+
+  @override
+  Widget build(BuildContext context) => ExcludeSemantics(
+    child: Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: PgTheme.skeletonBase(context),
+        borderRadius: BorderRadius.circular(10),
+      ),
+    ),
+  );
 }
 
 class PgCard extends StatelessWidget {
@@ -112,12 +193,15 @@ class SearchField extends StatelessWidget {
     this.hint = 'Search',
     this.onChanged,
     this.trailing,
+    this.autofocus = false,
   });
   final String hint;
   final ValueChanged<String>? onChanged;
   final Widget? trailing;
+  final bool autofocus;
   @override
   Widget build(BuildContext context) => TextField(
+    autofocus: autofocus,
     onChanged: onChanged,
     decoration: InputDecoration(
       hintText: hint,

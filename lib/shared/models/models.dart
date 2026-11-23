@@ -60,6 +60,7 @@ abstract class Bed with _$Bed {
     required String id,
     required String bedNumber,
     required String status,
+    @Default(false) bool isDisabledForRent,
     @Default([]) List<Resident> residents,
   }) = _Bed;
   factory Bed.fromJson(Map<String, dynamic> json) => _$BedFromJson(json);
@@ -82,6 +83,7 @@ abstract class Resident with _$Resident {
     String? agreementUrl,
     String? profession,
     required int monthlyRent,
+    @Default(1) int rentalFrequencyMonths,
     @Default(0) int securityDeposit,
     int? rentDueDay,
     String? propertyId,

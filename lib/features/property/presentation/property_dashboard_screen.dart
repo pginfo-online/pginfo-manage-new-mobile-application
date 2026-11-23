@@ -45,37 +45,12 @@ class _PropertyDashboardState extends ConsumerState<PropertyDashboardScreen> {
       length: 4,
       child: Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        appBar: AppBar(
-          backgroundColor: isDark ? PgTheme.darkCard : PgTheme.blue,
-          title: InkWell(
-            onTap: () => context.push('/properties/select'),
-            borderRadius: BorderRadius.circular(8),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.apartment),
-                  const SizedBox(width: 8),
-                  Flexible(
-                    child: Text(
-                      property?.name ?? 'Select property',
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                  const Icon(Icons.keyboard_arrow_down),
-                ],
-              ),
-            ),
-          ),
+        appBar: const PgHeader(
+          showProperty: true,
           bottom: TabBar(
             isScrollable: true,
             tabAlignment: TabAlignment.start,
-            indicatorColor: Colors.white,
-            labelColor: Colors.white,
-            unselectedLabelColor: isDark ? Colors.white60 : const Color(0xffb9c5fa),
-            tabs: const [
+            tabs: [
               Tab(text: 'Room'),
               Tab(text: 'Listing'),
               Tab(text: 'Complaint'),
@@ -273,7 +248,8 @@ class _PropertyDashboardState extends ConsumerState<PropertyDashboardScreen> {
                       ),
                       const SizedBox(height: 8),
                       TextButton(
-                        onPressed: () => ref.read(roomsProvider.notifier).refresh(),
+                        onPressed: () =>
+                            ref.read(roomsProvider.notifier).refresh(),
                         child: const Text('Retry loading rooms'),
                       ),
                     ],
@@ -311,7 +287,8 @@ class _PropertyDashboardState extends ConsumerState<PropertyDashboardScreen> {
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   child: TextButton(
-                    onPressed: () => ref.read(roomsProvider.notifier).loadMore(),
+                    onPressed: () =>
+                        ref.read(roomsProvider.notifier).loadMore(),
                     child: const Text('Load more rooms'),
                   ),
                 ),
@@ -357,66 +334,75 @@ class _PropertyDashboardState extends ConsumerState<PropertyDashboardScreen> {
       );
 
   Widget _listingTab(AsyncValue<List<Room>> rooms) => PgAsync(
-        value: rooms,
-        data: (items) {
-          final published = items.where((room) => room.isPublished).toList();
-          return ListView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.all(16),
-            children: [
-              Text(
-                'Published rooms',
-                style: Theme.of(context).textTheme.titleLarge,
+    value: rooms,
+    placeholder: const SingleChildScrollView(child: PropertyRoomSkeleton()),
+    retry: () => ref.invalidate(roomsProvider),
+    data: (items) {
+      final published = items.where((room) => room.isPublished).toList();
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        children: [
+          Text(
+            'Published rooms',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 12),
+          for (final room in published)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: RoomDashboardCard(room: room),
+            ),
+          if (published.isEmpty && !ref.read(roomsProvider.notifier).hasMore)
+            const Padding(
+              padding: EdgeInsets.all(24),
+              child: Center(child: Text('No rooms are published.')),
+            ),
+          if (ref.read(roomsProvider.notifier).hasMore)
+            Center(
+              child: TextButton(
+                onPressed: () => ref.read(roomsProvider.notifier).loadMore(),
+                child: const Text('Load more rooms'),
               ),
-              const SizedBox(height: 12),
-              for (final room in published)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: RoomDashboardCard(room: room),
-                ),
-              if (published.isEmpty && !ref.read(roomsProvider.notifier).hasMore)
-                const Padding(
-                  padding: EdgeInsets.all(24),
-                  child: Center(child: Text('No rooms are published.')),
-                ),
-              if (ref.read(roomsProvider.notifier).hasMore)
-                Center(
-                  child: TextButton(
-                    onPressed: () => ref.read(roomsProvider.notifier).loadMore(),
-                    child: const Text('Load more rooms'),
-                  ),
-                ),
-            ],
-          );
-        },
+            ),
+        ],
       );
+    },
+  );
 
   Widget _complaintTab(String id) => Consumer(
-        builder: (context, ref, _) => PgAsync(
-          value: ref.watch(_complaintsForProperty(id)),
-          data: (items) => ListView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.all(16),
-            children: [
-              if (items.isEmpty)
-                const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(32),
-                    child: Text('No complaints for this property.'),
-                  ),
-                ),
-              for (final item in items)
-                Card(
-                  color: PgTheme.cardBg(context),
-                  child: ListTile(
-                    title: Text('${item['description'] ?? 'Complaint'}'),
-                    subtitle: Text('${item['status'] ?? ''}'),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      );
+    builder: (context, ref, _) => PgAsync(
+      value: ref.watch(_complaintsForProperty(id)),
+      placeholder: const Column(
+        children: [
+          PgCard(child: PgSkeleton(height: 52)),
+          PgCard(child: PgSkeleton(height: 52)),
+        ],
+      ),
+      retry: () => ref.invalidate(_complaintsForProperty(id)),
+      data: (items) => ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        children: [
+          if (items.isEmpty)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(32),
+                child: Text('No complaints for this property.'),
+              ),
+            ),
+          for (final item in items)
+            Card(
+              color: PgTheme.cardBg(context),
+              child: ListTile(
+                title: Text('${item['description'] ?? 'Complaint'}'),
+                subtitle: Text('${item['status'] ?? ''}'),
+              ),
+            ),
+        ],
+      ),
+    ),
+  );
 }
 
 class RoomDashboardCard extends ConsumerStatefulWidget {
@@ -446,10 +432,7 @@ class _RoomDashboardCardState extends ConsumerState<RoomDashboardCard> {
             ),
             TextButton(
               onPressed: () => Navigator.pop(dialog, true),
-              child: const Text(
-                'Delete',
-                style: TextStyle(color: Colors.red),
-              ),
+              child: const Text('Delete', style: TextStyle(color: Colors.red)),
             ),
           ],
         ),
@@ -509,7 +492,9 @@ class _RoomDashboardCardState extends ConsumerState<RoomDashboardCard> {
             child: Align(
               alignment: Alignment.centerRight,
               child: Container(
-                color: isDark ? const Color(0xff161926) : const Color(0xfff3f4f8),
+                color: isDark
+                    ? const Color(0xff161926)
+                    : const Color(0xfff3f4f8),
                 width: 165,
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -523,9 +508,8 @@ class _RoomDashboardCardState extends ConsumerState<RoomDashboardCard> {
                     TextButton(
                       onPressed: busy
                           ? null
-                          : () => action(
-                                '/rooms/${room.id}/toggle-disable-rent',
-                              ),
+                          : () =>
+                                action('/rooms/${room.id}/toggle-disable-rent'),
                       child: Text(
                         room.isDisabledForRent
                             ? 'Enable for Rent'
@@ -620,7 +604,10 @@ class _RoomDashboardCardState extends ConsumerState<RoomDashboardCard> {
                               ),
                             ),
                             IconButton(
-                              icon: const Icon(Icons.more_vert, color: PgTheme.blue),
+                              icon: const Icon(
+                                Icons.more_vert,
+                                color: PgTheme.blue,
+                              ),
                               onPressed: () => setState(() => open = !open),
                             ),
                           ],
@@ -745,7 +732,11 @@ void showRoomDetailsSheet(
                               child: room.images.isEmpty
                                   ? ColoredBox(
                                       color: PgTheme.subtleHeaderBg(context),
-                                      child: const Icon(Icons.bed, size: 50, color: PgTheme.blue),
+                                      child: const Icon(
+                                        Icons.bed,
+                                        size: 50,
+                                        color: PgTheme.blue,
+                                      ),
                                     )
                                   : Image.network(
                                       room.images.first,
@@ -938,21 +929,17 @@ class _PropertyRoomSkeletonState extends State<PropertyRoomSkeleton>
     final highlightColor = PgTheme.skeletonHighlight(context);
 
     Widget block(double width, double height, {double radius = 8}) => Container(
-          width: width,
-          height: height,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(radius),
-            gradient: LinearGradient(
-              begin: Alignment(-1 + animation.value * 2, 0),
-              end: Alignment(animation.value * 2, 0),
-              colors: [
-                baseColor,
-                highlightColor,
-                baseColor,
-              ],
-            ),
-          ),
-        );
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(radius),
+        gradient: LinearGradient(
+          begin: Alignment(-1 + animation.value * 2, 0),
+          end: Alignment(animation.value * 2, 0),
+          colors: [baseColor, highlightColor, baseColor],
+        ),
+      ),
+    );
 
     return Semantics(
       label: 'Loading rooms',

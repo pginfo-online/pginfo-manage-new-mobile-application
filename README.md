@@ -7,15 +7,17 @@ Flutter client for the PgInfo NestJS API. The app provides five persistent navig
 ```sh
 flutter pub get
 dart run build_runner build
-flutter run --dart-define=API_BASE_URL=http://10.0.2.2:3000/api/v1
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:3009/api/v1
 ```
 
 
-## to run the application the chrome 
+To run the application in Chrome against the local backend:
 
-flutter run -d chrome --web-port=3001 --dart-define=API_BASE_URL=https://pginfo.space/api/v1
+```sh
+flutter run -d chrome --web-port=3001 --dart-define=API_BASE_URL=http://localhost:3009/api/v1
+```
 
-`10.0.2.2` resolves to the development host from the Android emulator. For a physical Android device on the same Wi-Fi, use your computer's LAN IP instead, for example `http://192.168.1.44:3000/api/v1`. HTTP is permitted only in Android debug builds; release builds require HTTPS. Start the backend, PostgreSQL, and Redis as described in `../backend/README.md`.
+`10.0.2.2` resolves to the development host from the Android emulator. For a physical Android device on the same Wi-Fi, use your computer's LAN IP and port 3009, for example `http://192.168.1.44:3009/api/v1`. For Chrome, make sure the backend's `CORS_ORIGINS` includes `http://localhost:3001`. HTTP is permitted only in Android debug builds; release builds require HTTPS. Start the backend, PostgreSQL, and Redis as described in `../backend/README.md`.
 
 
 

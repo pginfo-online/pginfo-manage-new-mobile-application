@@ -208,14 +208,20 @@ class _RoomCard extends StatelessWidget {
                   child: room.images.isEmpty
                       ? ColoredBox(
                           color: PgTheme.subtleHeaderBg(context),
-                          child: const Icon(Icons.bed_outlined, color: Color(0xff2563eb)),
+                          child: const Icon(
+                            Icons.bed_outlined,
+                            color: Color(0xff2563eb),
+                          ),
                         )
                       : Image.network(
                           room.images.first,
                           fit: BoxFit.cover,
                           errorBuilder: (_, _, _) => ColoredBox(
                             color: PgTheme.subtleHeaderBg(context),
-                            child: const Icon(Icons.bed_outlined, color: Color(0xff2563eb)),
+                            child: const Icon(
+                              Icons.bed_outlined,
+                              color: Color(0xff2563eb),
+                            ),
                           ),
                         ),
                 ),
@@ -259,60 +265,141 @@ class _RoomCard extends StatelessWidget {
   }
 }
 
-class PropertySelectScreen extends ConsumerWidget {
+class PropertySelectScreen extends ConsumerStatefulWidget {
   const PropertySelectScreen({super.key});
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) => Scaffold(
-    appBar: const PgHeader(title: 'Select property'),
-    floatingActionButton: FloatingActionButton.extended(
-      onPressed: () => context.push('/properties/new'),
-      icon: const Icon(Icons.add),
-      label: const Text('New property'),
-    ),
-    body: PgAsync(
-      value: ref.watch(propertiesProvider),
-      retry: () => ref.invalidate(propertiesProvider),
-      data: (props) => ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          if (props.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(24),
-              child: Text('Add your first property to get started.'),
-            ),
-          for (final p in props)
-            PgCard(
-              onTap: () {
-                ref.read(selectedPropertyProvider.notifier).select(p.id);
-                ref.read(roomSearchProvider.notifier).set('');
-                ref.read(roomFloorProvider.notifier).set(null);
-                context.go('/property');
-              },
-              child: Row(
-                children: [
-                  const CircleAvatar(child: Icon(Icons.apartment)),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          p.name,
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        Text('${p.type} • ${p.city ?? ''}'),
-                      ],
-                    ),
-                  ),
-                  if (ref.watch(selectedPropertyProvider) == p.id)
-                    const Icon(Icons.check_circle, color: Color(0xff2563eb)),
-                ],
+  ConsumerState<PropertySelectScreen> createState() => _PropertySelectState();
+}
+
+class _PropertySelectState extends ConsumerState<PropertySelectScreen> {
+  double drag = 0;
+  String query = '';
+  bool selecting = false;
+
+  void close() {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/home');
+    }
+  }
+
+  Future<void> select(String id) async {
+    if (selecting) return;
+    setState(() => selecting = true);
+    try {
+      await ref.read(selectedPropertyProvider.notifier).select(id);
+      if (!mounted) return;
+      ref.read(roomSearchProvider.notifier).set('');
+      ref.read(roomFloorProvider.notifier).set(null);
+      close();
+    } catch (error) {
+      if (mounted) showError(context, error);
+    } finally {
+      if (mounted) setState(() => selecting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final properties = ref.watch(propertiesProvider);
+    final selected = ref.watch(selectedPropertyProvider);
+    return Scaffold(
+      appBar: const PgHeader(title: 'Select property'),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => context.push('/properties/new'),
+        icon: const Icon(Icons.add),
+        label: const Text('New property'),
+      ),
+      body: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onHorizontalDragStart: (_) => drag = 0,
+        onHorizontalDragUpdate: (details) => drag += details.primaryDelta ?? 0,
+        onHorizontalDragEnd: (details) {
+          final velocity = details.primaryVelocity ?? 0;
+          if (!selecting && (drag < -60 || (drag < -16 && velocity < -250))) {
+            close();
+          }
+        },
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: SearchField(
+                hint: 'Search properties',
+                onChanged: (value) =>
+                    setState(() => query = value.trim().toLowerCase()),
               ),
             ),
-        ],
+            Expanded(
+              child: PgAsync(
+                value: properties,
+                retry: () => ref.invalidate(propertiesProvider),
+                placeholder: ListView(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  children: [
+                    for (var i = 0; i < 4; i++)
+                      const PgCard(child: PgSkeleton(height: 52)),
+                  ],
+                ),
+                data: (items) {
+                  final visible = items
+                      .where(
+                        (item) => '${item.name} ${item.city ?? ''} ${item.type}'
+                            .toLowerCase()
+                            .contains(query),
+                      )
+                      .toList();
+                  if (visible.isEmpty) {
+                    return Center(
+                      child: Text(
+                        items.isEmpty
+                            ? 'Add your first property to get started.'
+                            : 'No properties match your search.',
+                      ),
+                    );
+                  }
+                  return ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 92),
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
+                    itemCount: visible.length,
+                    itemBuilder: (context, index) {
+                      final property = visible[index];
+                      final active = property.id == selected;
+                      return PgCard(
+                        padding: EdgeInsets.zero,
+                        child: ListTile(
+                          selected: active,
+                          enabled: !selecting,
+                          leading: const CircleAvatar(
+                            child: Icon(Icons.apartment),
+                          ),
+                          title: Text(property.name),
+                          subtitle: Text(
+                            [
+                              property.type,
+                              if (property.city?.isNotEmpty == true)
+                                property.city!,
+                            ].join(' · '),
+                          ),
+                          trailing: Icon(
+                            active ? Icons.check_circle : Icons.chevron_right,
+                          ),
+                          onTap: () => select(property.id),
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 class PropertyFormScreen extends ConsumerStatefulWidget {
@@ -359,7 +446,7 @@ class _PropertyFormState extends ConsumerState<PropertyFormScreen> {
       final property = await ref
           .read(operationsViewModelProvider)
           .createProperty(body);
-      ref.read(selectedPropertyProvider.notifier).select(property.id);
+      await ref.read(selectedPropertyProvider.notifier).select(property.id);
       ref.invalidate(propertiesProvider);
       ref.invalidate(roomsProvider);
       ref.invalidate(dashboardProvider);

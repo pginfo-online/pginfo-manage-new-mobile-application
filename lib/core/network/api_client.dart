@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,6 +13,31 @@ final storageProvider = Provider<FlutterSecureStorage>(
   (ref) => const FlutterSecureStorage(),
 );
 
+// Claims are used for local scoping. The server authenticates the token.
+Map<String, dynamic>? readAccessTokenClaims(String? token) {
+  final parts = token?.split('.');
+  if (parts == null || parts.length != 3) return null;
+  try {
+    final claims = jsonDecode(
+      utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))),
+    );
+    return claims is Map<String, dynamic> ? claims : null;
+  } on FormatException {
+    return null;
+  }
+}
+
+final sessionRevisionProvider = NotifierProvider<SessionRevision, int>(
+  SessionRevision.new,
+);
+
+class SessionRevision extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void increment() => state++;
+}
+
 class ApiFailure implements Exception {
   const ApiFailure(this.message, this.status);
   final String message;
@@ -20,7 +47,7 @@ class ApiFailure implements Exception {
 }
 
 class ApiClient {
-  ApiClient(this.storage) {
+  ApiClient(this.storage, {this.onSessionExpired}) {
     if (kReleaseMode && Uri.parse(apiBaseUrl).scheme != 'https') {
       throw StateError('Release builds require an HTTPS API_BASE_URL');
     }
@@ -35,7 +62,9 @@ class ApiClient {
       InterceptorsWrapper(
         onRequest: (options, handler) async {
           final token = await storage.read(key: 'accessToken');
-          if (token != null) options.headers['Authorization'] = 'Bearer $token';
+          if (token != null && options.extra['retried'] != true) {
+            options.headers['Authorization'] = 'Bearer $token';
+          }
           options.headers['X-Request-Id'] = DateTime.now()
               .microsecondsSinceEpoch
               .toRadixString(36);
@@ -61,42 +90,104 @@ class ApiClient {
             handler.next(error);
             return;
           }
+          final authorization = error.requestOptions.headers['Authorization'];
+          final previous =
+              authorization is String && authorization.startsWith('Bearer ')
+              ? authorization.substring(7)
+              : null;
           try {
             final current = await storage.read(key: 'accessToken');
-            final accessToken =
-                current != null &&
-                    error.requestOptions.headers['Authorization'] !=
-                        'Bearer $current'
-                ? current
-                : await (_refreshing ??= _refreshAccessToken());
+            if (previous == null || current == null) {
+              handler.next(error);
+              return;
+            }
+            final access = current == previous
+                ? await (_refreshing ??= _refreshAccessToken(previous)
+                      .whenComplete(() => _refreshing = null))
+                : current;
+            if (!_sameSession(previous, access)) {
+              handler.next(error);
+              return;
+            }
             final request = error.requestOptions;
             request.extra['retried'] = true;
-            request.headers['Authorization'] = 'Bearer $accessToken';
+            request.headers['Authorization'] = 'Bearer $access';
             handler.resolve(await dio.fetch<dynamic>(request));
+          } on DioException catch (failure) {
+            handler.next(failure);
           } catch (_) {
-            await clearTokens();
             handler.next(error);
-          } finally {
-            _refreshing = null;
           }
         },
       ),
     );
   }
   final FlutterSecureStorage storage;
+  final VoidCallback? onSessionExpired;
   late final Dio dio;
   Future<String>? _refreshing;
-  Future<String> _refreshAccessToken() async {
-    final refresh = await storage.read(key: 'refreshToken');
-    if (refresh == null) throw const ApiFailure('Session expired', 401);
-    final response = await Dio(BaseOptions(baseUrl: apiBaseUrl))
-        .post<Map<String, dynamic>>(
-          '/auth/refresh',
-          data: {'refreshToken': refresh},
-        );
-    final tokens = response.data!['tokens'] as Map<String, dynamic>;
-    await saveTokens(tokens);
-    return tokens['accessToken'] as String;
+
+  bool _sameSession(String previous, String current) {
+    final before = readAccessTokenClaims(previous);
+    final after = readAccessTokenClaims(current);
+    return before?['sub'] != null &&
+        before?['sub'] == after?['sub'] &&
+        before?['orgId'] == after?['orgId'];
+  }
+
+  Future<String> _refreshAccessToken(String previous) async {
+    try {
+      final refresh = await storage.read(key: 'refreshToken');
+      if (refresh == null) throw const ApiFailure('Session expired', 401);
+      final organization = readAccessTokenClaims(previous)?['orgId'];
+      final response =
+          await Dio(
+            BaseOptions(
+              baseUrl: apiBaseUrl,
+              connectTimeout: const Duration(seconds: 12),
+              receiveTimeout: const Duration(seconds: 20),
+            ),
+          ).post<Map<String, dynamic>>(
+            '/auth/refresh',
+            data: {
+              'refreshToken': refresh,
+              if (organization is String) 'organizationId': organization,
+            },
+          );
+      final tokens = response.data!['tokens'] as Map<String, dynamic>;
+      final access = tokens['accessToken'] as String;
+      final current = await storage.read(key: 'accessToken');
+      if (current != previous) {
+        // Keep the access token selected by an organization switch, while
+        // retaining the rotated refresh token for that authenticated account.
+        if (current != null &&
+            readAccessTokenClaims(current)?['sub'] ==
+                readAccessTokenClaims(previous)?['sub']) {
+          await storage.write(
+            key: 'refreshToken',
+            value: tokens['refreshToken'] as String,
+          );
+          return current;
+        }
+        throw const ApiFailure('Session changed', 401);
+      }
+      if (!_sameSession(previous, access)) {
+        throw const ApiFailure('Session organization changed', 401);
+      }
+      await saveTokens(tokens);
+      return access;
+    } catch (failure) {
+      final unauthorized = switch (failure) {
+        DioException(:final response) => response?.statusCode == 401,
+        ApiFailure(:final status) => status == 401,
+        _ => false,
+      };
+      if (unauthorized && await storage.read(key: 'accessToken') == previous) {
+        await clearTokens();
+        onSessionExpired?.call();
+      }
+      rethrow;
+    }
   }
 
   Future<void> saveTokens(Map<String, dynamic> tokens) async {
@@ -168,5 +259,9 @@ class ApiClient {
 }
 
 final apiClientProvider = Provider<ApiClient>(
-  (ref) => ApiClient(ref.watch(storageProvider)),
+  (ref) => ApiClient(
+    ref.watch(storageProvider),
+    onSessionExpired: () =>
+        ref.read(sessionRevisionProvider.notifier).increment(),
+  ),
 );

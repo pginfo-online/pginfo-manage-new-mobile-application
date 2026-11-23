@@ -427,20 +427,15 @@ class TenantDetailScreen extends ConsumerWidget {
                     ),
                   ),
                 ),
-                PgCard(
-                  child: ListTile(
-                    leading: const Icon(Icons.autorenew),
-                    title: const Text('Autopay setup'),
-                    subtitle: Text(
-                      person.autopayActive ? 'Active' : 'Not set up',
-                    ),
-                    trailing: person.autopayActive
-                        ? null
-                        : TextButton(
-                            onPressed: () =>
-                                remindTenant(context, ref, id, kind: 'autopay'),
-                            child: const Text('Remind'),
-                          ),
+                _AutopayCard(person),
+                ListTile(
+                  leading: const Icon(Icons.message_outlined),
+                  title: const Text('WhatsApp reminder history'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => showModalBottomSheet<void>(
+                    context: context,
+                    showDragHandle: true,
+                    builder: (context) => _ReminderHistory(person.id),
                   ),
                 ),
                 const _SectionTitle('Personal details'),
@@ -730,6 +725,262 @@ String tenantRoom(Resident person) => person.room == null
     ? 'Unallocated'
     : 'Room ${person.room!.roomNumber}${person.bed == null ? '' : ' · Bed ${person.bed!.bedNumber}'}';
 
+final _reminderHistory = FutureProvider.autoDispose
+    .family<List<Map<String, dynamic>>, String>(
+      (ref, id) => ref
+          .watch(repositoryProvider)
+          .list('/announcements/reminders/whatsapp/$id'),
+    );
+
+class _ReminderHistory extends ConsumerWidget {
+  const _ReminderHistory(this.residentId);
+  final String residentId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => SafeArea(
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        children: [
+          ListTile(
+            title: const Text('WhatsApp reminder history'),
+            trailing: IconButton(
+              tooltip: 'Refresh delivery status',
+              onPressed: () => ref.invalidate(_reminderHistory(residentId)),
+              icon: const Icon(Icons.refresh),
+            ),
+          ),
+          Expanded(
+            child: PgAsync(
+              value: ref.watch(_reminderHistory(residentId)),
+              placeholder: const TenantSkeleton(TenantPlaceholder.fields),
+              retry: () => ref.invalidate(_reminderHistory(residentId)),
+              data: (items) => items.isEmpty
+                  ? const Center(
+                      child: Text('No accepted WhatsApp reminders yet.'),
+                    )
+                  : ListView(
+                      children: [
+                        for (final item in items)
+                          ListTile(
+                            title: Text(
+                              item['kind'] == 'autopay'
+                                  ? 'Autopay reminder'
+                                  : 'Rent reminder',
+                            ),
+                            subtitle: Text(_reminderStatus(item['status'])),
+                            trailing: Text(
+                              _reminderDate(context, item['requestedAt']),
+                            ),
+                          ),
+                      ],
+                    ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+
+  String _reminderStatus(Object? status) => switch (status) {
+    'sent' => 'Sent by WhatsApp',
+    'delivered' => 'Delivered',
+    'read' => 'Read',
+    'failed' => 'Delivery failed',
+    _ => 'Accepted by provider',
+  };
+
+  String _reminderDate(BuildContext context, Object? raw) {
+    final instant = raw is String ? DateTime.tryParse(raw) : null;
+    return instant == null
+        ? ''
+        : MaterialLocalizations.of(context).formatShortDate(instant.toLocal());
+  }
+}
+
+final _autopayMandates = FutureProvider.autoDispose
+    .family<List<Map<String, dynamic>>, String>(
+      (ref, id) => ref
+          .watch(repositoryProvider)
+          .list(
+            '/rent/mandates',
+            query: {'tenantId': id, 'limit': 100, 'collectionMode': 'AUTOPAY'},
+          ),
+    );
+
+class _AutopayCard extends ConsumerStatefulWidget {
+  const _AutopayCard(this.person);
+  final Resident person;
+
+  @override
+  ConsumerState<_AutopayCard> createState() => _AutopayCardState();
+}
+
+class _AutopayCardState extends ConsumerState<_AutopayCard> {
+  bool busy = false;
+
+  Future<void> setup() async {
+    final person = widget.person;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Request Autopay setup?'),
+        content: Text(
+          '${person.firstName} will need to authorize a monthly mandate '
+          'for ${rupees(person.monthlyRent)}. The request uses UPI and covers 11 payments.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => context.pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => context.pop(true),
+            child: const Text('Create request'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final result = await ref.read(operationsViewModelProvider).create(
+      '/rent/mandates/create',
+      {
+        'tenantId': person.id,
+        'rentAmount': person.monthlyRent,
+        'billingDay': person.rentDueDay ?? 5,
+        'sendWhatsAppNotification': false,
+      },
+    ) as Map;
+    ref.invalidate(_autopayMandates(person.id));
+    if (!mounted) return;
+    if (result['shortUrl'] case final String url) await share(url);
+  }
+
+  Future<void> share(String url) => SharePlus.instance.share(
+    ShareParams(
+      text:
+          'Hi ${widget.person.firstName}, use this link to authorize rent Autopay: $url',
+      subject: 'PgInfo rent Autopay setup',
+    ),
+  );
+
+  Future<void> run(Future<void> Function() action) async {
+    if (busy) return;
+    setState(() => busy = true);
+    try {
+      await action();
+    } catch (error) {
+      if (mounted) showError(context, error);
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final person = widget.person;
+    if (person.rentalFrequencyMonths > 1) {
+      return const PgCard(
+        child: ListTile(
+          leading: Icon(Icons.autorenew),
+          title: Text('Autopay setup'),
+          subtitle: Text(
+            'Available for monthly rental plans. Use a payment link for this tenant.',
+          ),
+        ),
+      );
+    }
+    if (person.autopayActive) {
+      return const PgCard(
+        child: ListTile(
+          leading: Icon(Icons.autorenew),
+          title: Text('Autopay setup'),
+          subtitle: Text('Active'),
+        ),
+      );
+    }
+    return PgCard(
+      child: PgAsync(
+        value: ref.watch(_autopayMandates(person.id)),
+        placeholder: const PgSkeleton(height: 66),
+        retry: () => ref.invalidate(_autopayMandates(person.id)),
+        data: (items) {
+          final relevant = items.where(
+            (item) => item['propertyId'] == person.propertyId,
+          );
+          final active = relevant.any((item) => item['status'] == 'ACTIVE');
+          final pending = relevant
+              .where(
+                (item) => const [
+                  'CREATED',
+                  'PENDING',
+                  'AUTHENTICATED',
+                ].contains(item['status']),
+              )
+              .firstOrNull;
+          final url = pending?['shortUrl'];
+          final awaiting = pending?['status'] == 'AUTHENTICATED';
+          final canRequest = const [
+            'ACTIVE',
+            'NOTICE_PERIOD',
+            'PENDING_MOVE_IN',
+          ].contains(person.status);
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.autorenew),
+                title: const Text('Autopay setup'),
+                subtitle: Text(
+                  active
+                      ? 'Active'
+                      : awaiting
+                      ? 'Authorization received'
+                      : pending != null
+                      ? 'Awaiting authorization'
+                      : 'Not set up',
+                ),
+              ),
+              if (canRequest && !active && !awaiting)
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    if (pending == null)
+                      FilledButton(
+                        onPressed: busy ? null : () => run(setup),
+                        child: const Text('Request setup'),
+                      ),
+                    if (url is String) ...[
+                      TextButton.icon(
+                        onPressed: busy ? null : () => run(() => share(url)),
+                        icon: const Icon(Icons.share_outlined),
+                        label: const Text('Share setup link'),
+                      ),
+                      TextButton(
+                        onPressed: busy
+                            ? null
+                            : () => run(
+                                () => remindTenant(
+                                  context,
+                                  ref,
+                                  person.id,
+                                  kind: 'autopay',
+                                ),
+                              ),
+                        child: const Text('Remind for Autopay'),
+                      ),
+                    ],
+                  ],
+                ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
 Future<void> remindTenant(
   BuildContext context,
   WidgetRef ref,
@@ -746,6 +997,7 @@ Future<void> remindTenant(
       },
     ) as Map;
     if (context.mounted) {
+      ref.invalidate(_reminderHistory(id));
       final whatsapp = result['whatsapp'] as Map?;
       final email = result['email'] as Map?;
       final message = switch (result) {

@@ -40,6 +40,7 @@ class _ActionState extends ConsumerState<ActionScreen> {
   String recordStatus = 'NEW';
   DateTime date = DateTime.now();
   bool busy = false;
+  bool routeTermsAccepted = false;
   bool profileReady = false;
   Object? profileError;
   XFile? formAttachment;
@@ -457,7 +458,14 @@ class _ActionState extends ConsumerState<ActionScreen> {
           await repo.create('/announcements/$announcementId/send', {});
           break;
         case 'bank':
+          if (!routeTermsAccepted) {
+            throw const ApiFailure(
+              'Accept Razorpay Route terms to continue',
+              null,
+            );
+          }
           await repo.create('/payouts/onboard-owner', {
+            'routeTermsAccepted': routeTermsAccepted,
             'ownerName': field('ownerName').text.trim(),
             'email': field('email').text.trim(),
             'phone': field('phone').text.trim(),
@@ -465,7 +473,8 @@ class _ActionState extends ConsumerState<ActionScreen> {
             'businessType': type,
             'accountNumber': field('accountNumber').text.trim(),
             'ifscCode': field('ifscCode').text.trim().toUpperCase(),
-            'panNumber': field('panNumber').text.trim().toUpperCase(),
+            if (field('panNumber').text.trim().isNotEmpty)
+              'panNumber': field('panNumber').text.trim().toUpperCase(),
             'propertyId': ?property,
           });
           break;
@@ -700,15 +709,48 @@ class _ActionState extends ConsumerState<ActionScreen> {
               'llp',
               'private_limited',
             ], (value) => setState(() => type = value)),
-            input('accountNumber', 'Account number'),
-            input('ifscCode', 'IFSC code'),
             PgField(
-              'PAN number',
+              'Account number',
+              controller: field('accountNumber'),
+              keyboardType: TextInputType.number,
+              validator: (value) =>
+                  RegExp(r'^\d{9,18}$').hasMatch(value?.trim() ?? '')
+                  ? null
+                  : 'Enter a 9 to 18 digit account number',
+            ),
+            PgField(
+              'IFSC code',
+              controller: field('ifscCode'),
+              validator: (value) =>
+                  RegExp(r'^[A-Z]{4}0[A-Z0-9]{6}$')
+                      .hasMatch(value?.trim().toUpperCase() ?? '')
+                  ? null
+                  : 'Enter a valid IFSC code',
+            ),
+            PgField(
+              'PAN number (if applicable)',
               controller: field('panNumber'),
               validator: (value) =>
-                  RegExp(r'^[A-Za-z]{5}[0-9]{4}[A-Za-z]$').hasMatch(value ?? '')
+                  (value?.trim().isEmpty ?? true) ||
+                      RegExp(r'^[A-Za-z]{5}[0-9]{4}[A-Za-z]$')
+                          .hasMatch(value?.trim() ?? '')
                   ? null
                   : 'Enter a valid PAN',
+            ),
+            TextButton(
+              onPressed: () => launchUrl(Uri.https('razorpay.com', '/terms/')),
+              child: const Text('Read Razorpay terms'),
+            ),
+            CheckboxListTile(
+              value: routeTermsAccepted,
+              onChanged: busy
+                  ? null
+                  : (value) =>
+                        setState(() => routeTermsAccepted = value ?? false),
+              title: const Text(
+                'I am authorized to accept Razorpay terms for this account',
+              ),
+              controlAffinity: ListTileControlAffinity.leading,
             ),
           ],
         );

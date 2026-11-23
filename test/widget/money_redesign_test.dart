@@ -191,6 +191,13 @@ void main() {
     'six money tabs render and dues expose accessible quick actions',
     (tester) async {
       await render(tester, const MoneyScreen());
+      await tester.runAsync(
+        () => precacheImage(
+          const ResizeImage(AssetImage('ui/ref.png'), width: 114),
+          tester.element(find.byType(MoneyScreen)),
+        ),
+      );
+      await tester.pumpAndSettle();
       for (final label in [
         'Due Packages',
         'Dues',

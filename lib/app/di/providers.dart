@@ -3,9 +3,28 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/network/api_client.dart';
 import '../../shared/models/models.dart';
 
-final sessionProvider = FutureProvider<String?>(
-  (ref) => ref.watch(storageProvider).read(key: 'accessToken'),
-);
+typedef LocalSession = ({
+  String scope,
+  String? organizationId,
+  String? propertyId,
+});
+
+final sessionProvider = FutureProvider<LocalSession?>((ref) async {
+  ref.watch(sessionRevisionProvider);
+  final storage = ref.watch(storageProvider);
+  final token = await storage.read(key: 'accessToken');
+  final claims = readAccessTokenClaims(token);
+  final user = claims?['sub'];
+  if (user is! String || user.isEmpty) return null;
+  final org = claims?['orgId'];
+  final organizationId = org is String ? org : null;
+  final scope = 'selectedProperty:$user:${organizationId ?? ''}';
+  return (
+    scope: scope,
+    organizationId: organizationId,
+    propertyId: await storage.read(key: scope),
+  );
+});
 final selectedPropertyProvider = NotifierProvider<SelectedProperty, String?>(
   SelectedProperty.new,
 );
@@ -29,14 +48,33 @@ final selectedOrganizationProvider =
 
 class SelectedOrganization extends Notifier<String?> {
   @override
-  String? build() => null;
+  String? build() => ref.watch(sessionProvider).value?.organizationId;
   void select(String? id) => state = id;
 }
 
 class SelectedProperty extends Notifier<String?> {
+  Future<void> _writes = Future.value();
+
   @override
-  String? build() => null;
-  void select(String? id) => state = id;
+  String? build() {
+    ref.watch(sessionProvider.select((value) => value.value?.scope));
+    return ref.read(sessionProvider).value?.propertyId;
+  }
+
+  Future<void> select(String? id) {
+    final scope = ref.read(sessionProvider).value?.scope;
+    if (scope == null) return Future.value();
+    final storage = ref.read(storageProvider);
+    final write = _writes.then(
+      (_) => id == null
+          ? storage.delete(key: scope)
+          : storage.write(key: scope, value: id),
+    );
+    _writes = write.then<void>((_) {}, onError: (Object _, StackTrace _) {});
+    return write.then((_) {
+      if (ref.read(sessionProvider).value?.scope == scope) state = id;
+    });
+  }
 }
 
 class AuthRepository {
@@ -95,8 +133,21 @@ class PgRepository {
     );
   }
 
-  Future<List<Property>> properties() async =>
-      pageData(await api.get('/properties'), Property.fromJson);
+  Future<List<Property>> properties() async {
+    const limit = 100;
+    final items = <String, Property>{};
+    for (var page = 1; ; page++) {
+      final batch = pageData(
+        await api.get('/properties', query: {'page': page, 'limit': limit}),
+        Property.fromJson,
+      );
+      for (final property in batch) {
+        items[property.id] = property;
+      }
+      if (batch.length < limit) return items.values.toList();
+    }
+  }
+
   Future<({List<Property> items, bool hasMore})> dashboardProperties(
     String search,
     int page,
@@ -153,6 +204,7 @@ class PgRepository {
     final res = await api.post('/properties/$propertyId/rooms', body);
     return Room.fromJson(Map<String, dynamic>.from(res as Map));
   }
+
   Future<List<Resident>> residents({
     String? propertyId,
     String? search,
@@ -302,9 +354,10 @@ class PgOperationsViewModel {
 final operationsViewModelProvider = Provider(
   (ref) => PgOperationsViewModel(ref.watch(repositoryProvider)),
 );
-final propertiesProvider = FutureProvider<List<Property>>(
-  (ref) => ref.watch(repositoryProvider).properties(),
-);
+final propertiesProvider = FutureProvider<List<Property>>((ref) {
+  ref.watch(sessionProvider);
+  return ref.watch(repositoryProvider).properties();
+});
 final organizationsProvider = FutureProvider<List<Map<String, dynamic>>>(
   (ref) => ref.watch(repositoryProvider).organizations(),
 );
