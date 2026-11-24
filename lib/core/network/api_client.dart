@@ -7,7 +7,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 const apiBaseUrl = String.fromEnvironment(
   'API_BASE_URL',
-  defaultValue: 'https://pginfo.space/api/v1',
+  defaultValue: 'https://app.pginfo.business/api/v1',
 );
 final storageProvider = Provider<FlutterSecureStorage>(
   (ref) => const FlutterSecureStorage(),
