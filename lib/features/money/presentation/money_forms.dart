@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
@@ -1116,6 +1117,78 @@ class _MoneyActionState extends ConsumerState<MoneyActionSheet> {
     super.dispose();
   }
 
+  Future<void> showPaymentQr() async {
+    setState(() => busy = true);
+    try {
+      final response = moneyMap(
+        await ref
+            .read(apiClientProvider)
+            .post('/money/residents/${widget.residentId}/payment-qr', {}),
+      );
+      if (!mounted) return;
+      final url = response['qrImageUrl'] as String;
+      final expiry = DateTime.tryParse('${response['expiresAt']}')?.toLocal();
+      await showDialog<void>(
+        context: context,
+        builder: (dialog) => AlertDialog(
+          title: const Text('Scan to pay PGInfo'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(moneyAmount(moneyInt(response['amount']))),
+                const SizedBox(height: 12),
+                Image.network(
+                  url,
+                  width: 210,
+                  height: 210,
+                  fit: BoxFit.contain,
+                  semanticLabel: 'Razorpay UPI payment QR code',
+                  errorBuilder: (_, _, _) => const Center(
+                    child: Text(
+                      'Use Share QR to open or send the payment code.',
+                    ),
+                  ),
+                ),
+                if (expiry != null)
+                  Text('Expires ${DateFormat.yMMMd().add_jm().format(expiry)}'),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialog),
+              child: const Text('Close'),
+            ),
+            Builder(
+              builder: (button) => FilledButton.icon(
+                onPressed: () async {
+                  try {
+                    await SharePlus.instance.share(
+                      ShareParams(
+                        text:
+                            'Pay ${moneyAmount(moneyInt(response['amount']))} to PGInfo using this Razorpay UPI payment QR.\n$url',
+                        sharePositionOrigin: moneyShareOrigin(button),
+                      ),
+                    );
+                  } catch (error) {
+                    if (dialog.mounted) showError(dialog, error);
+                  }
+                },
+                icon: const Icon(Icons.share_outlined),
+                label: const Text('Share QR'),
+              ),
+            ),
+          ],
+        ),
+      );
+    } catch (error) {
+      if (mounted) showError(context, error);
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final reminder =
@@ -1223,6 +1296,12 @@ class _MoneyActionState extends ConsumerState<MoneyActionSheet> {
                             label: Text(
                               busy ? 'Creating…' : 'Create Payment Link',
                             ),
+                          ),
+                        if (moneyInt(data['totalDues']) > 0)
+                          OutlinedButton.icon(
+                            onPressed: busy ? null : showPaymentQr,
+                            icon: const Icon(Icons.qr_code_2),
+                            label: const Text('Generate Payment QR'),
                           ),
                         Wrap(
                           alignment: WrapAlignment.spaceEvenly,

@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/network/api_client.dart';
+import '../../features/authentication/otp_challenge.dart';
 import '../../shared/models/models.dart';
 
 typedef LocalSession = ({
@@ -80,12 +81,12 @@ class SelectedProperty extends Notifier<String?> {
 class AuthRepository {
   AuthRepository(this.api);
   final ApiClient api;
-  Future<void> login(String email, String password) async {
-    final result = await api.post('/auth/login', {
-      'email': email,
+  Future<void> login(String identifier, String password) {
+    final accountField = identifier.contains('@') ? 'email' : 'mobile';
+    return _authenticate('/auth/login', {
+      accountField: identifier,
       'password': password,
-    }) as Map<String, dynamic>;
-    await api.saveTokens(Map<String, dynamic>.from(result['tokens'] as Map));
+    });
   }
 
   Future<void> register(
@@ -93,14 +94,55 @@ class AuthRepository {
     String password,
     String firstName,
     String organizationName,
-  ) async {
-    final result = await api.post('/auth/register', {
+  ) {
+    return _authenticate('/auth/register', {
       'email': email,
       'password': password,
       'firstName': firstName,
       'organizationName': organizationName,
-    }) as Map<String, dynamic>;
-    await api.saveTokens(Map<String, dynamic>.from(result['tokens'] as Map));
+    });
+  }
+
+  Future<OtpChallenge> requestOtp(
+    String mobile,
+    OtpPurpose purpose, {
+    bool resend = false,
+  }) async {
+    final result = await api.post(
+      resend ? '/auth/otp/resend' : '/auth/otp/send',
+      {'mobile': mobile, 'purpose': purpose.apiValue},
+    );
+    return OtpChallenge.fromResponse(result, mobile, purpose);
+  }
+
+  Future<void> loginWithOtp(String mobile, String otp) =>
+      _authenticate('/auth/otp/login', {'mobile': mobile, 'otp': otp});
+
+  Future<void> registerWithOtp({
+    required String mobile,
+    required String otp,
+    required String firstName,
+    String? lastName,
+    required String organizationName,
+  }) => _authenticate('/auth/otp/register', {
+    'mobile': mobile,
+    'otp': otp,
+    'firstName': firstName,
+    'lastName': ?lastName,
+    'organizationName': organizationName,
+  });
+
+  Future<void> _authenticate(String path, Map<String, dynamic> data) async {
+    final result = await api.post(path, data);
+    final tokens = result is Map<String, dynamic> ? result['tokens'] : null;
+    if (tokens is! Map<String, dynamic> ||
+        tokens['accessToken'] is! String ||
+        (tokens['accessToken'] as String).isEmpty ||
+        tokens['refreshToken'] is! String ||
+        (tokens['refreshToken'] as String).isEmpty) {
+      throw const ApiFailure('Unable to start your session. Try again.', null);
+    }
+    await api.saveTokens(tokens);
   }
 
   Future<void> logout() async {
@@ -646,8 +688,8 @@ final dashboardProvider = FutureProvider<Map<String, dynamic>>(
       .watch(repositoryProvider)
       .dashboard(ref.watch(selectedPropertyProvider)),
 );
-final dashboardPropertiesProvider =
-    FutureProvider.family<
+final dashboardPropertiesProvider = FutureProvider.autoDispose
+    .family<
       ({List<Property> items, bool hasMore}),
       ({String search, int page})
     >(
@@ -655,11 +697,12 @@ final dashboardPropertiesProvider =
           .watch(repositoryProvider)
           .dashboardProperties(query.search, query.page),
     );
-final dashboardPropertyNameProvider = FutureProvider.family<String, String>(
-  (ref, id) => ref.watch(repositoryProvider).dashboardPropertyName(id),
-);
-final dashboardPeriodProvider =
-    FutureProvider.family<
+final dashboardPropertyNameProvider = FutureProvider.autoDispose
+    .family<String, String>(
+      (ref, id) => ref.watch(repositoryProvider).dashboardPropertyName(id),
+    );
+final dashboardPeriodProvider = FutureProvider.autoDispose
+    .family<
       Map<String, dynamic>,
       ({String? propertyId, int month, int year, bool fy})
     >(

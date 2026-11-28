@@ -301,10 +301,12 @@ class _MoneyTabState extends ConsumerState<MoneyTab>
   Widget collectionCard(MoneyRow row) => MoneyTenantCard(
     resident: moneyMap(row['resident']),
     trailing: Text(
-      moneyAmount(moneyInt(row['amount'])),
+      moneyAmount(moneyInt(row['netAmountPaise'] ?? row['amount'])),
       style: const TextStyle(fontWeight: FontWeight.bold),
     ),
     children: [
+      if (moneyInt(row['gatewayRefundedAmount']) > 0)
+        Text('Refunded ${moneyAmount(moneyInt(row['gatewayRefundedAmount']))}'),
       const Divider(),
       Row(
         children: [
@@ -356,11 +358,15 @@ class _MoneyTabState extends ConsumerState<MoneyTab>
     ),
   );
   Widget bankCard(MoneyRow row) {
-    final metadata = row['metadata'];
-    final canVerify = metadata is Map && metadata['routeProductId'] is String;
-    final status = canVerify
-        ? "${row['status']} · KYC ${row['kycStatus']}"
-        : 'Verification required';
+    final isManual = '${row['razorpayAccountId']}'.startsWith('manual_');
+    final status = isManual
+        ? switch (row['status']) {
+            'ACTIVE' => 'Verified for manual payouts',
+            'REJECTED' => 'Bank details rejected',
+            'SUSPENDED' => 'Bank account suspended',
+            _ => 'Awaiting PGInfo review',
+          }
+        : "${row['status']} · KYC ${row['kycStatus']}";
     return PgCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -375,24 +381,9 @@ class _MoneyTabState extends ConsumerState<MoneyTab>
               '${row['accountNumberMasked']} · ${row['ifscCode']}\n$status',
             ),
           ),
-          if (canVerify)
-            TextButton.icon(
-              onPressed: () async {
-                try {
-                  await ref
-                      .read(apiClientProvider)
-                      .post('/payouts/accounts/${row['id']}/refresh', {});
-                  if (mounted) refreshMoney(ref);
-                } catch (e) {
-                  if (mounted) showError(context, e);
-                }
-              },
-              icon: const Icon(Icons.refresh),
-              label: const Text('Check Razorpay verification'),
-            )
-          else
+          if (!isManual)
             const Text(
-              'Legacy entry · add the bank account through Razorpay Route to verify it.',
+              'Submit these bank details again to enable manual payouts.',
             ),
           Text(
             'Property: ${row['property']?['name'] ?? 'Organization default'}',

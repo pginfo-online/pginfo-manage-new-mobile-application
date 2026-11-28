@@ -157,6 +157,7 @@ void refreshMoney(WidgetRef ref) {
   ref.invalidate(pagedListProvider);
   ref.invalidate(tenantLedgerProvider);
   ref.invalidate(dashboardProvider);
+  ref.invalidate(dashboardPeriodProvider);
   ref.invalidate(payoutAccountsProvider);
   ref.invalidate(optionsProvider);
 }

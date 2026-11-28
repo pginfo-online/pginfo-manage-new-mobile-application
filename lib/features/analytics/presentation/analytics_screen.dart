@@ -10,9 +10,7 @@ import '../../../core/design_system/theme.dart';
 import '../../../shared/components/common.dart';
 import '../../../shared/models/models.dart';
 
-const _green = PgTheme.positive,
-    _red = PgTheme.negative,
-    _ink = PgTheme.analyticsInk;
+const _green = PgTheme.positive, _red = PgTheme.negative;
 Map<String, dynamic> _part(Map<String, dynamic> data, String key) =>
     Map<String, dynamic>.from(data[key] as Map? ?? {});
 int _n(Map<String, dynamic> data, String key) =>
@@ -58,11 +56,12 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
       firstDate: DateTime(2000),
       lastDate: DateTime(DateTime.now().year + 1, 12, 31),
     );
-    if (picked != null) {
+    if (mounted && picked != null) {
       setState(() {
         period = DateTime(picked.year, picked.month);
         fy = false;
         nowSelected = false;
+        showPeriods = false;
       });
     }
   }
@@ -83,6 +82,8 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
     });
   }
 
+  ColorScheme get colors => Theme.of(context).colorScheme;
+
   @override
   Widget build(BuildContext context) {
     final selected = ref.watch(selectedPropertyProvider);
@@ -90,17 +91,12 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
         ? 'All properties'
         : ref.watch(dashboardPropertyNameProvider(selected)).asData?.value ??
               'Property';
-    final query = (
-      propertyId: selected,
-      month: period.month,
-      year: period.year,
-      fy: fy,
-    );
-    final value = ref.watch(dashboardPeriodProvider(query));
     return DefaultTabController(
       length: 5,
       child: Scaffold(
-        backgroundColor: PgTheme.analyticsCanvas,
+        backgroundColor: Theme.of(context).brightness == Brightness.dark
+            ? PgTheme.darkCanvas
+            : PgTheme.analyticsCanvas,
         appBar: AppBar(
           title: InkWell(
             onTap: () => context.push('/properties/select'),
@@ -112,17 +108,6 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
               ],
             ),
           ),
-          actions: const [
-            Padding(
-              padding: EdgeInsets.only(right: 16),
-              child: Center(
-                child: Text(
-                  'ⓘ BETA',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-              ),
-            ),
-          ],
           bottom: const TabBar(
             isScrollable: true,
             tabAlignment: TabAlignment.start,
@@ -141,11 +126,24 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
         ),
         body: TabBarView(
           children: [
-            _birds(selected),
-            _async(value, _financial),
-            _async(value, _occupancy),
-            _async(value, _tenants),
-            _async(value, _issues),
+            Consumer(builder: (context, ref, _) => _birds(ref, selected)),
+            for (final buildTab in [_financial, _occupancy, _tenants, _issues])
+              Consumer(
+                builder: (context, ref, _) {
+                  final provider = dashboardPeriodProvider((
+                    propertyId: selected,
+                    month: period.month,
+                    year: period.year,
+                    fy: fy,
+                  ));
+                  final value = ref.watch(provider);
+                  return _async(
+                    value,
+                    buildTab,
+                    () => ref.invalidate(provider),
+                  );
+                },
+              ),
           ],
         ),
       ),
@@ -155,37 +153,29 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
   Widget _async(
     AsyncValue<Map<String, dynamic>> value,
     Widget Function(Map<String, dynamic>) builder,
+    VoidCallback retry,
   ) {
     final data = value.asData?.value;
     if (data != null) return builder(data);
     if (value.hasError) {
-      return PgAsync(
-        value: value,
-        data: builder,
-        retry: () => ref.invalidate(
-          dashboardPeriodProvider((
-            propertyId: ref.read(selectedPropertyProvider),
-            month: period.month,
-            year: period.year,
-            fy: fy,
-          )),
-        ),
-      );
+      return PgAsync(value: value, data: builder, retry: retry);
     }
     return const _DashboardSkeleton();
   }
 
-  Widget _birds(String? selected) {
+  Widget _birds(WidgetRef ref, String? selected) {
     final matches = <Property>[];
     var hasMore = false;
     var loading = false;
     Object? error;
+    var missingPage = 1;
     for (var page = 1; page <= propertyPages; page++) {
       final value = ref.watch(
         dashboardPropertiesProvider((search: search, page: page)),
       );
       final result = value.asData?.value;
       if (result == null) {
+        missingPage = page;
         loading = value.isLoading;
         error = value.error;
         break;
@@ -196,7 +186,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
     return Column(
       children: [
         Container(
-          color: Colors.white,
+          color: colors.surface,
           padding: const EdgeInsets.all(16),
           child: SearchField(
             hint: 'Search properties',
@@ -247,7 +237,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
                 );
               }
               if (combined && index == 1) {
-                return _property('Combined summary', null, true);
+                return _property('Combined summary', null, selected == null);
               }
               if (matches.isEmpty && index == 1) {
                 if (loading) return _panel(const _SkeletonLines());
@@ -257,7 +247,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
                       onPressed: () => ref.invalidate(
                         dashboardPropertiesProvider((
                           search: search,
-                          page: propertyPages,
+                          page: missingPage,
                         )),
                       ),
                       child: const Text('Retry loading properties'),
@@ -275,7 +265,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
                       onPressed: () => ref.invalidate(
                         dashboardPropertiesProvider((
                           search: search,
-                          page: propertyPages,
+                          page: missingPage,
                         )),
                       ),
                       child: const Text('Retry loading properties'),
@@ -300,16 +290,27 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
 
   Widget _property(String name, String? id, bool current) => Consumer(
     builder: (context, ref, _) {
-      final value = ref.watch(
-        dashboardPeriodProvider((
-          propertyId: id,
-          month: period.month,
-          year: period.year,
-          fy: fy,
-        )),
-      );
+      final provider = dashboardPeriodProvider((
+        propertyId: id,
+        month: period.month,
+        year: period.year,
+        fy: fy,
+      ));
+      final value = ref.watch(provider);
       final data = value.asData?.value;
-      if (data == null) return _panel(const _SkeletonLines());
+      if (data == null) {
+        return _panel(
+          value.hasError
+              ? ListTile(
+                  title: Text(name),
+                  subtitle: TextButton(
+                    onPressed: () => ref.invalidate(provider),
+                    child: const Text('Retry loading summary'),
+                  ),
+                )
+              : const _SkeletonLines(),
+        );
+      }
       final op = _part(data, 'operational'), f = _part(data, 'financial');
       final beds = _n(op, 'totalBeds'),
           occupied = _n(op, 'occupiedBeds'),
@@ -330,16 +331,11 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
                 if (current) const Chip(label: Text('Current')),
               ],
             ),
-            if (id != null)
-              Text(
-                'Property ID: $id',
-                style: const TextStyle(color: Colors.grey, fontSize: 12),
-              ),
             const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xfff7f7f9),
+                color: colors.surfaceContainerLow,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Column(
@@ -355,9 +351,9 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
                   ),
                   const SizedBox(height: 8),
                   LinearProgressIndicator(
-                    value: beds == 0 ? 0 : occupied / beds,
+                    value: beds == 0 ? 0 : (occupied / beds).clamp(0.0, 1.0),
                     color: _green,
-                    backgroundColor: const Color(0xffd1d2d7),
+                    backgroundColor: colors.surfaceContainerHighest,
                     minHeight: 8,
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -424,12 +420,12 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
           'Dues Overview',
           [
             (_r(f, 'outstandingBalancePaise'), 'All-time dues'),
-            (_r(f, 'pastDuesPaise'), 'All past dues'),
+            (_r(f, 'pastDuesPaise'), 'Before selected period'),
             (_r(f, 'monthOutstandingPaise'), 'Period dues'),
           ],
           [
             ('All-time dues', _r(f, 'outstandingBalancePaise')),
-            ('Past dues', _r(f, 'pastDuesPaise')),
+            ('Before selected period', _r(f, 'pastDuesPaise')),
             ('Period dues', _r(f, 'monthOutstandingPaise')),
             ('Overdue', _r(f, 'overdueDuesPaise')),
           ],
@@ -520,46 +516,59 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
           children: [
             const _Title('Occupancy Status'),
             Text(
-              'Total Beds: $total · $total rentable',
-              style: const TextStyle(color: Colors.grey),
+              'Total rentable beds: $total',
+              style: TextStyle(color: colors.onSurfaceVariant),
             ),
             const SizedBox(height: 24),
             Row(
               children: [
-                SizedBox(
-                  width: 140,
-                  height: 140,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      const SizedBox.expand(
-                        child: CircularProgressIndicator(
-                          value: 1,
-                          strokeWidth: 14,
-                          color: _red,
+                Flexible(
+                  child: AspectRatio(
+                    aspectRatio: 1,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        const SizedBox.expand(
+                          child: CircularProgressIndicator(
+                            value: 1,
+                            strokeWidth: 14,
+                            color: _red,
+                          ),
                         ),
-                      ),
-                      SizedBox.expand(
-                        child: CircularProgressIndicator(
-                          value: total == 0 ? 0 : occupied / total,
-                          strokeWidth: 14,
-                          color: _green,
+                        SizedBox.expand(
+                          child: CircularProgressIndicator(
+                            value: total == 0
+                                ? 0
+                                : (occupied / total).clamp(0.0, 1.0),
+                            strokeWidth: 14,
+                            color: _green,
+                          ),
                         ),
-                      ),
-                      Text(
-                        '${_n(op, 'occupancyRate')}%',
-                        style: Theme.of(context).textTheme.headlineSmall
-                            ?.copyWith(fontWeight: FontWeight.bold),
-                      ),
-                    ],
+                        Text(
+                          '${_n(op, 'occupancyRate')}%',
+                          style: Theme.of(context).textTheme.headlineSmall
+                              ?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                const SizedBox(width: 20),
+                const SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     children: [
                       _line('Occupied', '$occupied', _green),
-                      _line('Vacant', '${total - occupied}', _red),
+                      if (_n(op, 'reservedBeds') > 0)
+                        _line(
+                          'Reserved',
+                          '${_n(op, 'reservedBeds')}',
+                          Colors.orange,
+                        ),
+                      _line(
+                        'Available',
+                        '${_n(op, 'availableBeds')}',
+                        PgTheme.blue,
+                      ),
                     ],
                   ),
                 ),
@@ -627,10 +636,6 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
               '${(_n(op, 'activeTenants') - _n(op, 'residentsWithIdProof')).clamp(0, 999999999)}',
               _red,
             ),
-            const Text(
-              'Document upload is not a completed identity check.',
-              style: TextStyle(color: Colors.grey, fontSize: 12),
-            ),
           ],
         ),
       ),
@@ -682,10 +687,33 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
       () => setPeriod('Current FY'),
       choosePeriod,
     ],
-    now && nowSelected ? 'Now' : periodLabel,
+    now && nowSelected
+        ? 'Now'
+        : const ['This Month', 'Last Month', 'Current FY'].contains(periodLabel)
+        ? periodLabel
+        : 'Custom',
   );
-  Widget _scroll(List<Widget> children) =>
-      ListView(padding: const EdgeInsets.all(16), children: children);
+  Widget _scroll(List<Widget> children) => RefreshIndicator(
+    onRefresh: () async {
+      final provider = dashboardPeriodProvider((
+        propertyId: ref.read(selectedPropertyProvider),
+        month: period.month,
+        year: period.year,
+        fy: fy,
+      ));
+      try {
+        ref.invalidate(provider);
+        await ref.read(provider.future);
+      } catch (_) {
+        // The mounted analytics tab displays the provider error and retry.
+      }
+    },
+    child: ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.all(16),
+      children: children,
+    ),
+  );
   Widget _panel(Widget child) => Container(
     margin: const EdgeInsets.only(bottom: 16),
     padding: const EdgeInsets.all(20),
@@ -710,11 +738,15 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
         return ActionChip(
           label: Text(labels[i]),
           onPressed: actions[i],
-          backgroundColor: active ? _ink : Colors.white,
-          labelStyle: TextStyle(color: active ? Colors.white : _ink),
+          backgroundColor: active ? colors.primaryContainer : colors.surface,
+          labelStyle: TextStyle(
+            color: active ? colors.onPrimaryContainer : colors.onSurface,
+          ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(9),
-            side: BorderSide(color: active ? _ink : const Color(0xffe6e6e9)),
+            side: BorderSide(
+              color: active ? colors.primary : colors.outlineVariant,
+            ),
           ),
         );
       },
@@ -738,7 +770,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
           ],
         ),
         SizedBox(
-          height: 140,
+          height: MediaQuery.textScalerOf(context).scale(124) + 24,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: cards.length,
@@ -747,7 +779,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
               width: 145,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                border: Border.all(color: const Color(0xffe8e8eb)),
+                border: Border.all(color: colors.outlineVariant),
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Column(
@@ -756,10 +788,19 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
                 children: [
                   Text(
                     cards[i].$1,
-                    style: Theme.of(context).textTheme.headlineSmall
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleLarge
                         ?.copyWith(fontWeight: FontWeight.bold),
                   ),
-                  Text(cards[i].$2, style: const TextStyle(color: Colors.grey)),
+                  Flexible(
+                    child: Text(
+                      cards[i].$2,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: colors.onSurfaceVariant),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -774,7 +815,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
         isScrollControlled: true,
         showDragHandle: true,
         builder: (sheet) => SafeArea(
-          child: Padding(
+          child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -858,13 +899,14 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
     padding: const EdgeInsets.symmetric(vertical: 9),
     child: Row(
       children: [
-        SizedBox(width: 116, child: Text(label)),
+        Flexible(flex: 2, child: Text(label)),
         Expanded(
+          flex: 3,
           child: Container(
             height: 30,
             alignment: Alignment.centerLeft,
             decoration: BoxDecoration(
-              color: const Color(0xfff2f4f7),
+              color: colors.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(6),
             ),
             child: FractionallySizedBox(
@@ -879,7 +921,12 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
           ),
         ),
         const SizedBox(width: 8),
-        Text(money ? rupees(value) : '$value'),
+        Flexible(
+          child: Text(
+            money ? rupees(value) : '$value',
+            textAlign: TextAlign.end,
+          ),
+        ),
       ],
     ),
   );
@@ -917,22 +964,32 @@ class _Title extends StatelessWidget {
 class _SkeletonLines extends StatelessWidget {
   const _SkeletonLines();
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      for (final width in [120.0, 240.0, 190.0, 260.0])
-        Padding(
-          padding: const EdgeInsets.only(bottom: 16),
-          child: Container(
-            width: width,
-            height: 22,
-            decoration: BoxDecoration(
-              color: const Color(0xffe7e9ef),
-              borderRadius: BorderRadius.circular(7),
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      const widths = [120.0, 240.0, 190.0, 260.0];
+      final height = constraints.maxHeight;
+      final count = height.isFinite
+          ? (height / 38).floor().clamp(1, widths.length)
+          : widths.length;
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (var i = 0; i < count; i++)
+            Padding(
+              padding: EdgeInsets.only(bottom: i == count - 1 ? 0 : 16),
+              child: Container(
+                width: widths[i],
+                height: height < 22 ? height : 22,
+                decoration: BoxDecoration(
+                  color: PgTheme.skeletonBase(context),
+                  borderRadius: BorderRadius.circular(7),
+                ),
+              ),
             ),
-          ),
-        ),
-    ],
+        ],
+      );
+    },
   );
 }
 
@@ -981,7 +1038,7 @@ class _DashboardSkeletonState extends State<_DashboardSkeleton>
                   margin: const EdgeInsets.only(bottom: 16),
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: PgTheme.cardBg(context),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: ShaderMask(
@@ -995,10 +1052,10 @@ class _DashboardSkeletonState extends State<_DashboardSkeleton>
                         -0.5 + (reduceMotion ? 0 : controller.value * 3),
                         0,
                       ),
-                      colors: const [
-                        Color(0xffe7e9ef),
-                        Color(0xfff8f9fc),
-                        Color(0xffe7e9ef),
+                      colors: [
+                        PgTheme.skeletonBase(context),
+                        PgTheme.skeletonHighlight(context),
+                        PgTheme.skeletonBase(context),
                       ],
                     ).createShader(bounds),
                     child: const _SkeletonLines(),

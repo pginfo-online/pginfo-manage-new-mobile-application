@@ -39,9 +39,11 @@ class SessionRevision extends Notifier<int> {
 }
 
 class ApiFailure implements Exception {
-  const ApiFailure(this.message, this.status);
+  const ApiFailure(this.message, this.status, {this.code, this.retryAfter});
   final String message;
   final int? status;
+  final String? code;
+  final Duration? retryAfter;
   @override
   String toString() => message;
 }
@@ -61,9 +63,11 @@ class ApiClient {
     dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
-          final token = await storage.read(key: 'accessToken');
-          if (token != null && options.extra['retried'] != true) {
-            options.headers['Authorization'] = 'Bearer $token';
+          if (!options.path.startsWith('/auth/otp/')) {
+            final token = await storage.read(key: 'accessToken');
+            if (token != null && options.extra['retried'] != true) {
+              options.headers['Authorization'] = 'Bearer $token';
+            }
           }
           options.headers['X-Request-Id'] = DateTime.now()
               .microsecondsSinceEpoch
@@ -220,7 +224,15 @@ class ApiClient {
     ),
   );
   Future<dynamic> post(String path, Map<String, dynamic> data) async =>
-      _request(() => dio.post<dynamic>(path, data: data));
+      _request(
+        () => dio.post<dynamic>(
+          path,
+          data: data,
+          options: path.startsWith('/auth/otp/')
+              ? Options(receiveTimeout: const Duration(seconds: 35))
+              : null,
+        ),
+      );
   Future<dynamic> upload(
     String path, {
     required String filePath,
@@ -247,12 +259,21 @@ class ApiClient {
       final message = body is Map
           ? (body['detail'] ?? body['message'] ?? body['title'])?.toString()
           : null;
+      final code = body is Map ? (body['code'] ?? body['title']) : null;
+      final bodyDelay = body is Map ? body['retryAfterSeconds'] : null;
+      final seconds = bodyDelay is int
+          ? bodyDelay
+          : int.tryParse(e.response?.headers.value('retry-after') ?? '');
       throw ApiFailure(
         message ??
             (e.type == DioExceptionType.connectionError
                 ? 'Connection unavailable. Check your network.'
                 : 'Request failed. Please try again.'),
         e.response?.statusCode,
+        code: code is String ? code : null,
+        retryAfter: seconds != null && seconds > 0
+            ? Duration(seconds: seconds)
+            : null,
       );
     }
   }

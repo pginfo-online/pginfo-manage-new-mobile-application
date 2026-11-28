@@ -4,6 +4,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/app/di/providers.dart';
 import 'package:mobile/core/network/api_client.dart';
+import 'package:mobile/core/design_system/theme.dart';
 import 'package:mobile/features/analytics/presentation/analytics_screen.dart';
 import 'package:mobile/shared/models/models.dart';
 
@@ -79,4 +80,45 @@ void main() {
       expect(find.text('Occupancy Status'), findsOneWidget);
     },
   );
+  testWidgets('analytics keeps its dark theme at phone size with larger text', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(360, 760));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          repositoryProvider.overrideWith((ref) => _DashboardRepository()),
+        ],
+        child: MaterialApp(
+          theme: PgTheme.build(Brightness.dark),
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context)
+                .copyWith(textScaler: TextScaler.linear(1.35)),
+            child: child!,
+          ),
+          home: const AnalyticsScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final scaffold = tester.widget<Scaffold>(find.byType(Scaffold));
+    expect(scaffold.backgroundColor, PgTheme.darkCanvas);
+    expect(find.text('Vanaliika'), findsOneWidget);
+    await tester.drag(find.byType(TabBarView), const Offset(-320, 0));
+    await tester.pumpAndSettle();
+    expect(find.text('Dues Overview'), findsOneWidget);
+    final filters = find
+        .ancestor(
+          of: find.text('Dues').first,
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    await tester.drag(filters, const Offset(-248, 0));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ActionChip, 'Collections'));
+    await tester.pumpAndSettle();
+    expect(find.text('Collection Overview'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }

@@ -40,7 +40,6 @@ class _ActionState extends ConsumerState<ActionScreen> {
   String recordStatus = 'NEW';
   DateTime date = DateTime.now();
   bool busy = false;
-  bool routeTermsAccepted = false;
   bool profileReady = false;
   Object? profileError;
   XFile? formAttachment;
@@ -458,14 +457,7 @@ class _ActionState extends ConsumerState<ActionScreen> {
           await repo.create('/announcements/$announcementId/send', {});
           break;
         case 'bank':
-          if (!routeTermsAccepted) {
-            throw const ApiFailure(
-              'Accept Razorpay Route terms to continue',
-              null,
-            );
-          }
           await repo.create('/payouts/onboard-owner', {
-            'routeTermsAccepted': routeTermsAccepted,
             'ownerName': field('ownerName').text.trim(),
             'email': field('email').text.trim(),
             'phone': field('phone').text.trim(),
@@ -473,8 +465,6 @@ class _ActionState extends ConsumerState<ActionScreen> {
             'businessType': type,
             'accountNumber': field('accountNumber').text.trim(),
             'ifscCode': field('ifscCode').text.trim().toUpperCase(),
-            if (field('panNumber').text.trim().isNotEmpty)
-              'panNumber': field('panNumber').text.trim().toUpperCase(),
             'propertyId': ?property,
           });
           break;
@@ -727,30 +717,8 @@ class _ActionState extends ConsumerState<ActionScreen> {
                   ? null
                   : 'Enter a valid IFSC code',
             ),
-            PgField(
-              'PAN number (if applicable)',
-              controller: field('panNumber'),
-              validator: (value) =>
-                  (value?.trim().isEmpty ?? true) ||
-                      RegExp(r'^[A-Za-z]{5}[0-9]{4}[A-Za-z]$')
-                          .hasMatch(value?.trim() ?? '')
-                  ? null
-                  : 'Enter a valid PAN',
-            ),
-            TextButton(
-              onPressed: () => launchUrl(Uri.https('razorpay.com', '/terms/')),
-              child: const Text('Read Razorpay terms'),
-            ),
-            CheckboxListTile(
-              value: routeTermsAccepted,
-              onChanged: busy
-                  ? null
-                  : (value) =>
-                        setState(() => routeTermsAccepted = value ?? false),
-              title: const Text(
-                'I am authorized to accept Razorpay terms for this account',
-              ),
-              controlAffinity: ListTileControlAffinity.leading,
+            const Text(
+              'PGInfo will review these bank details for manual payouts.',
             ),
           ],
         );
@@ -1386,93 +1354,131 @@ class _NotificationsScreen extends ConsumerWidget {
   );
 }
 
+final _receiptProvider = FutureProvider.autoDispose
+    .family<Map<String, dynamic>, String>(
+      (ref, id) => ref.watch(operationsViewModelProvider).receipt(id),
+    );
+
 class _ReceiptScreen extends ConsumerWidget {
   const _ReceiptScreen({required this.id});
   final String? id;
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) => Scaffold(
-    appBar: const PgHeader(title: 'Payment receipt'),
-    body: id == null
-        ? const Center(child: Text('Receipt unavailable'))
-        : FutureBuilder<dynamic>(
-            future: ref.read(operationsViewModelProvider).receipt(id!),
-            builder: (context, snap) {
-              if (snap.hasError) {
-                return Center(child: Text(snap.error.toString()));
-              }
-              if (!snap.hasData) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              final data = Map<String, dynamic>.from(snap.data as Map);
-              final resident = data['resident'] is Map
-                  ? Map<String, dynamic>.from(data['resident'] as Map)
-                  : <String, dynamic>{};
-              return ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  PgCard(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Receipt ${data['receiptNumber'] ?? id}',
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        const Divider(),
-                        ListTile(
-                          title: const Text('Tenant'),
-                          subtitle: Text('${resident['name'] ?? '—'}'),
-                        ),
-                        ListTile(
-                          title: const Text('Property'),
-                          subtitle: Text('${resident['property'] ?? '—'}'),
-                        ),
-                        ListTile(
-                          title: const Text('Amount'),
-                          subtitle: Text(
-                            '${data['amountFormatted'] ?? rupees((data['amountPaise'] as num?) ?? 0)}',
-                          ),
-                        ),
-                        ListTile(
-                          title: const Text('Mode'),
-                          subtitle: Text('${data['mode'] ?? '—'}'),
-                        ),
-                        ListTile(
-                          title: const Text('Collection date'),
-                          subtitle: Text('${data['collectionDate'] ?? '—'}'),
-                        ),
-                      ],
-                    ),
-                  ),
-                  FilledButton.icon(
-                    onPressed: () async {
-                      await Clipboard.setData(
-                        ClipboardData(text: data.toString()),
-                      );
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Receipt copied')),
-                        );
-                      }
-                    },
-                    icon: const Icon(Icons.copy),
-                    label: const Text('Copy receipt details'),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: () => SharePlus.instance.share(
-                      ShareParams(
-                        text:
-                            'PgInfo receipt\n${resident['name'] ?? ''}\n${data['amountFormatted'] ?? ''}\n${data['collectionDate'] ?? ''}',
-                      ),
-                    ),
-                    icon: const Icon(Icons.share_outlined),
-                    label: const Text('Share receipt'),
-                  ),
-                ],
-              );
-            },
+  Widget build(BuildContext context, WidgetRef ref) {
+    final receiptId = id;
+    final provider = receiptId == null ? null : _receiptProvider(receiptId);
+    return Scaffold(
+      appBar: const PgHeader(title: 'Payment receipt'),
+      body: provider == null
+          ? const Center(child: Text('Receipt unavailable'))
+          : PgAsync(
+              value: ref.watch(provider),
+              retry: () => ref.invalidate(provider),
+              data: (data) => _ReceiptDetails(data: data),
+            ),
+    );
+  }
+}
+
+class _ReceiptDetails extends StatelessWidget {
+  const _ReceiptDetails({required this.data});
+  final Map<String, dynamic> data;
+
+  @override
+  Widget build(BuildContext context) {
+    final resident = data['resident'] as Map? ?? {};
+    final number = data['receiptNumber'] ?? '';
+    final rows = <(String, String)>[
+      ('Tenant', '${resident['name'] ?? '—'}'),
+      ('Property', '${resident['property'] ?? '—'}'),
+      (
+        'Amount paid',
+        '${data['amountFormatted'] ?? rupees(data['amountPaise'] as num? ?? 0)}',
+      ),
+      ('Payment method', '${data['mode'] ?? '—'}'.replaceAll('_', ' ')),
+      ('Collection date', '${data['collectionDate'] ?? '—'}'.split('T').first),
+      if (data['reference'] case final String reference)
+        ('Reference', reference),
+      if ((data['refundedAmountPaise'] as num? ?? 0) > 0)
+        ('Refunded', '${data['refundedAmountFormatted']}'),
+      if (data['allocations'] case final List allocations)
+        for (final allocation in allocations.whereType<Map>())
+          (
+            '${allocation['description'] ?? allocation['type'] ?? 'Charge'}'
+                .replaceAll('_', ' '),
+            '${allocation['amountFormatted']}',
           ),
-  );
+    ];
+    final shareText = [
+      'PGInfo payment receipt $number',
+      for (final row in rows) '${row.$1}: ${row.$2}',
+    ].join('\n');
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        PgCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Receipt $number',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const Divider(),
+              for (final row in rows)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(row.$1),
+                  subtitle: SelectableText(row.$2),
+                ),
+            ],
+          ),
+        ),
+        Builder(
+          builder: (buttonContext) => FilledButton.icon(
+            onPressed: () async {
+              try {
+                await SharePlus.instance.share(
+                  ShareParams(
+                    text: shareText,
+                    subject: 'PGInfo payment receipt $number',
+                    sharePositionOrigin: _receiptShareOrigin(buttonContext),
+                  ),
+                );
+              } catch (error) {
+                if (context.mounted) showError(context, error);
+              }
+            },
+            icon: const Icon(Icons.share_outlined),
+            label: const Text('Share receipt'),
+          ),
+        ),
+        OutlinedButton.icon(
+          onPressed: () async {
+            try {
+              await Clipboard.setData(ClipboardData(text: shareText));
+              if (context.mounted) {
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(const SnackBar(content: Text('Receipt copied')));
+              }
+            } catch (error) {
+              if (context.mounted) showError(context, error);
+            }
+          },
+          icon: const Icon(Icons.copy),
+          label: const Text('Copy receipt details'),
+        ),
+      ],
+    );
+  }
+}
+
+Rect? _receiptShareOrigin(BuildContext context) {
+  final box = context.findRenderObject();
+  return box is RenderBox && box.hasSize
+      ? box.localToGlobal(Offset.zero) & box.size
+      : null;
 }
 
 class _ReportScreen extends ConsumerWidget {
